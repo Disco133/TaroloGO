@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 from typing import Annotated
 import models
+import bcrypt
 
 app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
@@ -13,6 +14,7 @@ models.Base.metadata.create_all(bind=engine)
 class UserCreate(BaseModel):
     username: str
     email: str
+    phone_number: str
     password: str
 
 
@@ -21,6 +23,7 @@ class UserOut(BaseModel):
     user_id: int
     username: str
     email: str
+    phone_number: str
 
     # Позволяет Pydantic работать с ORM объектами
     # class Config:
@@ -38,13 +41,28 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 
+# функция хеширования пароля
+def hash_password(password: str) -> str:
+    # Генерируем соль
+    salt = bcrypt.gensalt()
+    # Хешируем пароль с использованием соли
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password.decode('utf-8')
+
+
+# функция сверки пароля с его хеш версией
+def verify_password(password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+
 # Функция для создания пользователя
 def create_user(db: Session, user: UserCreate):
     # Здесь вы можете добавить логику хеширования пароля
-    hashed_password = user.password
+    hashed_password = hash_password(user.password)
     db_user = models.UserProfile(
         username=user.username,
         email=user.email,
+        phone_number=user.phone_number,
         password_hashed=hashed_password
     )
     db.add(db_user)

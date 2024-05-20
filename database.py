@@ -9,6 +9,3 @@ engine = create_engine(DATABASE_URL)  # создание движка для п�
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)  # создание сессии базы данных
 
 Base = declarative_base()  # для работы с базой данных не через sql-запросы, а с помощью python классов
-
-
-

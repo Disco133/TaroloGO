@@ -32,7 +32,7 @@ class UserProfile(Base):
     # role_id = Column(Integer, ForeignKey('role.role_id'))
     username = Column(String, index=True, nullable=False, unique=True)
     email = Column(String, index=True, unique=True, nullable=False)
-    # phone_number = Column(String, unique=True, nullable=False, index=True)
+    phone_number = Column(String, unique=True, nullable=False, index=True)
     password_hashed = Column(String, nullable=False)
     # first_name = Column(String, nullable=True)
     # second_name = Column(String, nullable=True)
