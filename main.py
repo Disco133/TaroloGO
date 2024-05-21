@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, select
 from database import SessionLocal, engine
 from typing import Annotated
 import models
@@ -264,20 +265,28 @@ async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db
 
 @app.get("/user_specialization/{user_id}")
 async def read_specialization_by_user(user_id: int, db: db_dependency):
-    specialization_bond_query = (db.query(models.Specialization).join(models.UserSpecialization).join(models.UserProfile)
-                            .filter(models.UserSpecialization.user_id == user_id).first())
+    specialization_bond_query = (
+        db.query(models.Specialization.specialization_name)
+        .join(models.UserSpecialization, models.UserSpecialization.specialization_id == models.Specialization.specialization_id)
+        .join(models.UserProfile, models.UserProfile.user_id == models.UserSpecialization.user_id)
+        .filter(models.UserProfile.user_id == user_id)
+        .all()
+    )
     if not specialization_bond_query:
         raise HTTPException(status_code=404, detail='User is not found')
-    return specialization_bond_query
+    specializations = [{"specialization_name": specialization.specialization_name} for specialization in
+                       specialization_bond_query]
+    return {"user_id": user_id, "specializations": specializations}
 
 
 @app.get("/specialization_users/{specialization_id}")
 async def read_users_by_specialization(specialization_id: int, db: db_dependency):
     specialization_bond_query = (db.query(models.UserProfile).join(models.UserSpecialization).join(models.Specialization)
-                            .filter(models.UserSpecialization.specialization_id == specialization_id).first())
+                            .filter(models.UserSpecialization.specialization_id == specialization_id).all())
     if not specialization_bond_query:
         raise HTTPException(status_code=404, detail='Specialization is not found')
-    return specialization_bond_query
+    users = [{'users_name': users.username} for users in specialization_bond_query]
+    return {"specialization_id": specialization_id, "usernames": users}
 
 
 def delete_users_specialization(db: Session, user_id: int, specialization_id: int):
