@@ -1,3 +1,4 @@
+from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -21,6 +22,9 @@ class UserCreate(BaseModel):
     email: str
     phone_number: str
     password: str
+    first_name: str
+    second_name: str
+    date_birth: datetime
 
 
 # Pydantic модель для вывода пользователя
@@ -29,6 +33,9 @@ class UserOut(BaseModel):
     username: str
     email: str
     phone_number: str
+    first_name: str
+    second_name: str
+    date_birth: datetime
 
 
 #####   ROLE_MODELS   #####
@@ -81,7 +88,10 @@ def create_user(db: Session, user: UserCreate):
         role_id=user.role_id,
         email=user.email,
         phone_number=user.phone_number,
-        password_hashed=hashed_password
+        password_hashed=hashed_password,
+        first_name=user.first_name,
+        second_name=user.second_name,
+        date_birth=user.date_birth
     )
     db.add(db_user)
     db.commit()
