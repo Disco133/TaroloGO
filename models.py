@@ -29,7 +29,7 @@ class UserProfile(Base):
     __tablename__ = 'user_profile'
 
     user_id = Column(Integer, primary_key=True, index=True)
-    # role_id = Column(Integer, ForeignKey('role.role_id'))
+    role_id = Column(Integer, ForeignKey('role.role_id', ondelete='CASCADE'))
     username = Column(String, index=True, nullable=False, unique=True)
     email = Column(String, index=True, unique=True, nullable=False)
     phone_number = Column(String, unique=True, nullable=False, index=True)
