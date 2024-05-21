@@ -43,6 +43,32 @@ class RoleOut(BaseModel):
     role_name: str
 
 
+#####   SPEC_MODELS   #####
+
+
+class SpecCreate(BaseModel):
+    specialization_name: str
+
+
+class SpecOut(BaseModel):
+    specialization_id: int
+    specialization_name: str
+
+
+#####   SPEC_CONNECTION_MODELS   #####
+
+
+class UserSpecializationCreate(BaseModel):
+    specialization_id: int
+    user_id: int
+
+
+class UserSpecializationOut(BaseModel):
+    user_specialization_id: int
+    specialization_id: int
+    user_id: int
+
+
 def get_db():
     db = SessionLocal()  # создаём сессию базы данных
     try:
@@ -124,23 +150,23 @@ async def delete_user_endpoint(user_id: int, db: db_dependency):
 ###############################
 
 
-# Функция для создания пользователя
+# Функция для создания роли
 def create_role(db: Session, role: RoleCreate):
-    db_user = models.Role(
+    db_role = models.Role(
         role_name=role.role_name
     )
-    db.add(db_user)
+    db.add(db_role)
     db.commit()
-    db.refresh(db_user)
-    return db_user
+    db.refresh(db_role)
+    return db_role
 
 
 @app.post("/role", response_model=RoleOut)
 async def create_role_endpoint(role: RoleCreate, db: db_dependency):
-    db_user = create_role(db, role)
-    if db_user is None:
+    db_role = create_role(db, role)
+    if db_role is None:
         raise HTTPException(status_code=400, detail="Role creation failed")
-    return db_user
+    return db_role
 
 
 @app.get("/role/{role_id}")
@@ -157,12 +183,118 @@ def delete_role(db: Session, role_id: int):
         raise HTTPException(status_code=404, detail="Role not found")
     db.delete(role_query)
     db.commit()
-    return {"message": "User deleted successfully"}
+    return {"message": "Role deleted successfully"}
 
 
 @app.delete("/role/{role_id}")
 async def delete_user_endpoint(role_id: int, db: db_dependency):
     return delete_role(db, role_id)
+
+
+###############################
+#            spec             #
+###############################
+
+
+# Функция для создания специализации
+def create_specialization(db: Session, spec: SpecCreate):
+    db_spec = models.Specialization(
+        specialization_name=spec.specialization_name
+    )
+    db.add(db_spec)
+    db.commit()
+    db.refresh(db_spec)
+    return db_spec
+
+
+@app.post("/specialization", response_model=SpecOut)
+async def create_specialization_endpoint(spec: SpecCreate, db: db_dependency):
+    db_spec = create_specialization(db, spec)
+    if db_spec is None:
+        raise HTTPException(status_code=400, detail="Specialization creation failed")
+    return db_spec
+
+
+@app.get("/specialization/{specialization_id}")
+async def read_specialization(specialization_id: int, db: db_dependency):
+    specialization_query = db.query(models.Specialization).filter(models.Specialization.specialization_id == specialization_id).first()
+    if not specialization_query:
+        raise HTTPException(status_code=404, detail='Specialization is not found')
+    return specialization_query
+
+
+def delete_specialization(db: Session, specialization_id: int):
+    specialization_query = db.query(models.Specialization).filter(models.Specialization.specialization_id == specialization_id).first()
+    if not specialization_query:
+        raise HTTPException(status_code=404, detail="Specialization not found")
+    db.delete(specialization_query)
+    db.commit()
+    return {"message": "Specialization deleted successfully"}
+
+
+@app.delete("/specialization/{specialization_id}")
+async def delete_specialization_endpoint(specialization_id: int, db: db_dependency):
+    return delete_specialization(db, specialization_id)
+
+
+###############################
+#       spec_connection       #
+###############################
+
+
+# Функция для создания специализации
+def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate):
+    db_spec_bond = models.UserSpecialization(
+        specialization_id=spec_bond.specialization_id,
+        user_id=spec_bond.user_id
+    )
+    db.add(db_spec_bond)
+    db.commit()
+    db.refresh(db_spec_bond)
+    return db_spec_bond
+
+
+@app.post("/specialization_bond", response_model=UserSpecializationOut)
+async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db: db_dependency):
+    db_spec_bond = create_specialization_bond(db, spec_bond)
+    if db_spec_bond is None:
+        raise HTTPException(status_code=400, detail="Specialization bond creation failed")
+    return db_spec_bond
+
+
+@app.get("/user_specialization/{user_id}")
+async def read_specialization_by_user(user_id: int, db: db_dependency):
+    specialization_bond_query = (db.query(models.Specialization).join(models.UserSpecialization).join(models.UserProfile)
+                            .filter(models.UserSpecialization.user_id == user_id).first())
+    if not specialization_bond_query:
+        raise HTTPException(status_code=404, detail='User is not found')
+    return specialization_bond_query
+
+
+@app.get("/specialization_users/{specialization_id}")
+async def read_users_by_specialization(specialization_id: int, db: db_dependency):
+    specialization_bond_query = (db.query(models.UserProfile).join(models.UserSpecialization).join(models.Specialization)
+                            .filter(models.UserSpecialization.specialization_id == specialization_id).first())
+    if not specialization_bond_query:
+        raise HTTPException(status_code=404, detail='Specialization is not found')
+    return specialization_bond_query
+
+
+def delete_users_specialization(db: Session, user_id: int, specialization_id: int):
+    user_specialization_query = db.query(models.UserSpecialization).filter(
+        models.UserSpecialization.user_id == user_id,
+        models.UserSpecialization.specialization_id == specialization_id)
+    user_specialization_query = user_specialization_query.first()
+    if not user_specialization_query:
+        raise HTTPException(status_code=404, detail="User/Specialization not found")
+    db.delete(user_specialization_query)
+    db.commit()
+    return {"message": "User's specialization deleted successfully"}
+
+
+@app.delete("/users/{user_id}/specialization/{specialization_id}")
+async def delete_user_specialization_endpoint(user_id: int, specialization_id: int, db: db_dependency):
+    return delete_users_specialization(db, user_id, specialization_id)
 
 
 # автоматический запуск uvicorn
