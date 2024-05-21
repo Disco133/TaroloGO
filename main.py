@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
 
 
- #####   USER_MODELS   #####
+#####   USER_MODELS   #####
 
 
 # Pydantic модель для создания пользователя
@@ -74,7 +75,6 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 # Функция для создания пользователя
 def create_user(db: Session, user: UserCreate):
-    # Здесь вы можете добавить логику хеширования пароля
     hashed_password = hash_password(user.password)
     db_user = models.UserProfile(
         username=user.username,
@@ -126,7 +126,6 @@ async def delete_user_endpoint(user_id: int, db: db_dependency):
 
 # Функция для создания пользователя
 def create_role(db: Session, role: RoleCreate):
-    # Здесь вы можете добавить логику хеширования пароля
     db_user = models.Role(
         role_name=role.role_name
     )
@@ -164,3 +163,13 @@ def delete_role(db: Session, role_id: int):
 @app.delete("/role/{role_id}")
 async def delete_user_endpoint(role_id: int, db: db_dependency):
     return delete_role(db, role_id)
+
+
+# автоматический запуск uvicorn
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host='127.0.0.1',
+        port=8000,
+        reload=True
+    )

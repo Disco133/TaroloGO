@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql://postgres:***пароль***@localhost:5432/TaroloGO"  # ссылка на базу данных
+DATABASE_URL = "postgresql://postgres:taro123123@localhost:5432/TaroloGO"  # ссылка на базу данных
 
 engine = create_engine(DATABASE_URL)  # создание движка для подключения к базе данных
 

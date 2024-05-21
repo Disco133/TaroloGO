@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, DateTime, Float
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, DateTime, Float, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -38,7 +38,7 @@ class UserProfile(Base):
     # second_name = Column(String, nullable=True)
     # date_birth = Column(Date, nullable=False)
     # last_seen = Column(DateTime, nullable=False)
-    # date_registration = Column(DateTime, nullable=False)
+    date_registration = Column(DateTime, nullable=False, default=func.now())
     # is_deleted = Column(Boolean, default=False)
     # profile_picture = Column(String, nullable=True)
     # tarot_description = Column(String, nullable=True)
