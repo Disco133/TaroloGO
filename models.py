@@ -49,7 +49,7 @@ class UserProfile(Base):
     date_birth = Column(Date, nullable=False)
     # last_seen = Column(DateTime, nullable=False)
     date_registration = Column(DateTime, nullable=False, default=func.now())
-    # is_deleted = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     # profile_picture = Column(String, nullable=True)
     # tarot_description = Column(String, nullable=True)
     # tarot_experience = Column(Float, nullable=True)
