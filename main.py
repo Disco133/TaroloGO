@@ -3,7 +3,6 @@ import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, select
 from database import SessionLocal, engine
 from typing import Annotated
 import models
@@ -23,8 +22,6 @@ class UserCreate(BaseModel):
     email: str
     phone_number: str
     password: str
-    first_name: str
-    second_name: str
     date_birth: datetime
 
 
@@ -34,9 +31,19 @@ class UserOut(BaseModel):
     username: str
     email: str
     phone_number: str
-    first_name: str
-    second_name: str
     date_birth: datetime
+
+
+class UserDateBirthUpdate(BaseModel):
+    date_birth: datetime
+
+
+class UserFirstNameUpdate(BaseModel):
+    first_name: str
+
+
+class UserSecondNameUpdate(BaseModel):
+    second_name: str
 
 
 #####   ROLE_MODELS   #####
@@ -116,14 +123,13 @@ def create_user(db: Session, user: UserCreate):
         email=user.email,
         phone_number=user.phone_number,
         password_hashed=hashed_password,
-        first_name=user.first_name,
-        second_name=user.second_name,
         date_birth=user.date_birth
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 # создание юзера
 @app.post("/users", response_model=UserOut)
@@ -133,6 +139,46 @@ async def create_user_endpoint(user: UserCreate, db: db_dependency):
         raise HTTPException(status_code=400, detail="User creation failed")
     return db_user
 
+
+# обновление имени в профиле
+@app.post("/users/{user_id}/update_first_name/", response_model=UserOut)
+def update_user_first_name(user_id: int, user_update: UserFirstNameUpdate, db: Session = Depends(get_db)):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.first_name = user_update.first_name
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+# обновление фамилии в профиле
+@app.post("/users/{user_id}/update_second_name/", response_model=UserOut)
+def update_user_second_name(user_id: int, user_update: UserSecondNameUpdate, db: Session = Depends(get_db)):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.second_name = user_update.second_name
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+# обновление даты рождения в профиле
+@app.post("/users/{user_id}/update_date_birth/", response_model=UserOut)
+def update_user_date_birth(user_id: int, user_update: UserDateBirthUpdate, db: Session = Depends(get_db)):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.date_birth = user_update.date_birth
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
 # юзер по айди
 @app.get("/users/{user_id}")
 async def read_user(user_id: int, db: db_dependency):
@@ -140,6 +186,7 @@ async def read_user(user_id: int, db: db_dependency):
     if not user:
         raise HTTPException(status_code=404, detail='user is not found')
     return user
+
 
 # функция для удаления юзера
 def delete_user(db: Session, user_id: int):
@@ -149,6 +196,7 @@ def delete_user(db: Session, user_id: int):
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully"}
+
 
 # удаление юзера
 @app.delete("/users/{user_id}")
@@ -171,6 +219,7 @@ def create_role(db: Session, role: RoleCreate):
     db.refresh(db_role)
     return db_role
 
+
 # создание роли
 @app.post("/role", response_model=RoleOut)
 async def create_role_endpoint(role: RoleCreate, db: db_dependency):
@@ -178,6 +227,7 @@ async def create_role_endpoint(role: RoleCreate, db: db_dependency):
     if db_role is None:
         raise HTTPException(status_code=400, detail="Role creation failed")
     return db_role
+
 
 # название роли по её айди
 @app.get("/role/{role_id}")
@@ -187,6 +237,18 @@ async def read_user(role_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail='Role is not found')
     return role_query
 
+
+# выводит всех юзеров по определённой роли
+@app.get('/role_users/{role_id}')
+async def read_users_by_role(role_id: int, db: db_dependency):
+    read_role_query = (
+        db.query(models.UserProfile).join(models.Role).filter(models.UserProfile.role_id == role_id).all())
+    if not read_role_query:
+        raise HTTPException(status_code=404, detail='Role is not found')
+    users = [{'users_name': users.username} for users in read_role_query]
+    return {'role_id': role_id, 'username': users}
+
+
 # функция для удаления роли
 def delete_role(db: Session, role_id: int):
     role_query = db.query(models.Role).filter(models.Role.role_id == role_id).first()
@@ -195,6 +257,7 @@ def delete_role(db: Session, role_id: int):
     db.delete(role_query)
     db.commit()
     return {"message": "Role deleted successfully"}
+
 
 # удаление роли
 @app.delete("/role/{role_id}")
@@ -217,6 +280,7 @@ def create_specialization(db: Session, spec: SpecCreate):
     db.refresh(db_spec)
     return db_spec
 
+
 # создания специализации
 @app.post("/specialization", response_model=SpecOut)
 async def create_specialization_endpoint(spec: SpecCreate, db: db_dependency):
@@ -225,22 +289,27 @@ async def create_specialization_endpoint(spec: SpecCreate, db: db_dependency):
         raise HTTPException(status_code=400, detail="Specialization creation failed")
     return db_spec
 
+
 # название специализации по её айди
 @app.get("/specialization/{specialization_id}")
 async def read_specialization(specialization_id: int, db: db_dependency):
-    specialization_query = db.query(models.Specialization).filter(models.Specialization.specialization_id == specialization_id).first()
+    specialization_query = db.query(models.Specialization).filter(
+        models.Specialization.specialization_id == specialization_id).first()
     if not specialization_query:
         raise HTTPException(status_code=404, detail='Specialization is not found')
     return specialization_query
 
+
 # функция для удаления специализации
 def delete_specialization(db: Session, specialization_id: int):
-    specialization_query = db.query(models.Specialization).filter(models.Specialization.specialization_id == specialization_id).first()
+    specialization_query = db.query(models.Specialization).filter(
+        models.Specialization.specialization_id == specialization_id).first()
     if not specialization_query:
         raise HTTPException(status_code=404, detail="Specialization not found")
     db.delete(specialization_query)
     db.commit()
     return {"message": "Specialization deleted successfully"}
+
 
 # удаление специализации
 @app.delete("/specialization/{specialization_id}")
@@ -264,6 +333,7 @@ def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate)
     db.refresh(db_spec_bond)
     return db_spec_bond
 
+
 # связь юзер - специализация
 @app.post("/specialization_bond", response_model=UserSpecializationOut)
 async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db: db_dependency):
@@ -272,12 +342,14 @@ async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db
         raise HTTPException(status_code=400, detail="Specialization bond creation failed")
     return db_spec_bond
 
+
 # выводит все специализации определённого юзера
 @app.get("/user_specialization/{user_id}")
 async def read_specialization_by_user(user_id: int, db: db_dependency):
     specialization_bond_query = (
         db.query(models.Specialization.specialization_name)
-        .join(models.UserSpecialization, models.UserSpecialization.specialization_id == models.Specialization.specialization_id)
+        .join(models.UserSpecialization,
+              models.UserSpecialization.specialization_id == models.Specialization.specialization_id)
         .join(models.UserProfile, models.UserProfile.user_id == models.UserSpecialization.user_id)
         .filter(models.UserProfile.user_id == user_id)
         .all()
@@ -292,8 +364,9 @@ async def read_specialization_by_user(user_id: int, db: db_dependency):
 # выводит всех юзеров по определённой специализации
 @app.get("/specialization_users/{specialization_id}")
 async def read_users_by_specialization(specialization_id: int, db: db_dependency):
-    specialization_bond_query = (db.query(models.UserProfile).join(models.UserSpecialization).join(models.Specialization)
-                            .filter(models.UserSpecialization.specialization_id == specialization_id).all())
+    specialization_bond_query = (
+        db.query(models.UserProfile).join(models.UserSpecialization).join(models.Specialization)
+        .filter(models.UserSpecialization.specialization_id == specialization_id).all())
     if not specialization_bond_query:
         raise HTTPException(status_code=404, detail='Specialization is not found')
     users = [{'users_name': users.username} for users in specialization_bond_query]
