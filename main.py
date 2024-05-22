@@ -124,7 +124,7 @@ def create_user(db: Session, user: UserCreate):
     db.refresh(db_user)
     return db_user
 
-
+# создание юзера
 @app.post("/users", response_model=UserOut)
 async def create_user_endpoint(user: UserCreate, db: db_dependency):
     db_user = create_user(db, user)
@@ -132,7 +132,7 @@ async def create_user_endpoint(user: UserCreate, db: db_dependency):
         raise HTTPException(status_code=400, detail="User creation failed")
     return db_user
 
-
+# юзер по айди
 @app.get("/users/{user_id}")
 async def read_user(user_id: int, db: db_dependency):
     user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
@@ -140,7 +140,7 @@ async def read_user(user_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail='user is not found')
     return user
 
-
+# функция для удаления юзера
 def delete_user(db: Session, user_id: int):
     user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
     if not user:
@@ -149,7 +149,7 @@ def delete_user(db: Session, user_id: int):
     db.commit()
     return {"message": "User deleted successfully"}
 
-
+# удаление юзера
 @app.delete("/users/{user_id}")
 async def delete_user_endpoint(user_id: int, db: db_dependency):
     return delete_user(db, user_id)
@@ -170,7 +170,7 @@ def create_role(db: Session, role: RoleCreate):
     db.refresh(db_role)
     return db_role
 
-
+# создание роли
 @app.post("/role", response_model=RoleOut)
 async def create_role_endpoint(role: RoleCreate, db: db_dependency):
     db_role = create_role(db, role)
@@ -178,7 +178,7 @@ async def create_role_endpoint(role: RoleCreate, db: db_dependency):
         raise HTTPException(status_code=400, detail="Role creation failed")
     return db_role
 
-
+# название роли по её айди
 @app.get("/role/{role_id}")
 async def read_user(role_id: int, db: db_dependency):
     role_query = db.query(models.Role).filter(models.Role.role_id == role_id).first()
@@ -186,7 +186,7 @@ async def read_user(role_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail='Role is not found')
     return role_query
 
-
+# функция для удаления роли
 def delete_role(db: Session, role_id: int):
     role_query = db.query(models.Role).filter(models.Role.role_id == role_id).first()
     if not role_query:
@@ -195,7 +195,7 @@ def delete_role(db: Session, role_id: int):
     db.commit()
     return {"message": "Role deleted successfully"}
 
-
+# удаление роли
 @app.delete("/role/{role_id}")
 async def delete_user_endpoint(role_id: int, db: db_dependency):
     return delete_role(db, role_id)
@@ -216,7 +216,7 @@ def create_specialization(db: Session, spec: SpecCreate):
     db.refresh(db_spec)
     return db_spec
 
-
+# создания специализации
 @app.post("/specialization", response_model=SpecOut)
 async def create_specialization_endpoint(spec: SpecCreate, db: db_dependency):
     db_spec = create_specialization(db, spec)
@@ -224,7 +224,7 @@ async def create_specialization_endpoint(spec: SpecCreate, db: db_dependency):
         raise HTTPException(status_code=400, detail="Specialization creation failed")
     return db_spec
 
-
+# название специализации по её айди
 @app.get("/specialization/{specialization_id}")
 async def read_specialization(specialization_id: int, db: db_dependency):
     specialization_query = db.query(models.Specialization).filter(models.Specialization.specialization_id == specialization_id).first()
@@ -232,7 +232,7 @@ async def read_specialization(specialization_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail='Specialization is not found')
     return specialization_query
 
-
+# функция для удаления специализации
 def delete_specialization(db: Session, specialization_id: int):
     specialization_query = db.query(models.Specialization).filter(models.Specialization.specialization_id == specialization_id).first()
     if not specialization_query:
@@ -241,7 +241,7 @@ def delete_specialization(db: Session, specialization_id: int):
     db.commit()
     return {"message": "Specialization deleted successfully"}
 
-
+# удаление специализации
 @app.delete("/specialization/{specialization_id}")
 async def delete_specialization_endpoint(specialization_id: int, db: db_dependency):
     return delete_specialization(db, specialization_id)
@@ -252,7 +252,7 @@ async def delete_specialization_endpoint(specialization_id: int, db: db_dependen
 ###############################
 
 
-# Функция для создания специализации
+# Функция для создания связи юзер - специализация
 def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate):
     db_spec_bond = models.UserSpecialization(
         specialization_id=spec_bond.specialization_id,
@@ -263,7 +263,7 @@ def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate)
     db.refresh(db_spec_bond)
     return db_spec_bond
 
-
+# связь юзер - специализация
 @app.post("/specialization_bond", response_model=UserSpecializationOut)
 async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db: db_dependency):
     db_spec_bond = create_specialization_bond(db, spec_bond)
@@ -271,23 +271,31 @@ async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db
         raise HTTPException(status_code=400, detail="Specialization bond creation failed")
     return db_spec_bond
 
-
+# выводит все специализации определённого юзера
 @app.get("/user_specialization/{user_id}")
 async def read_specialization_by_user(user_id: int, db: db_dependency):
-    specialization_bond_query = (db.query(models.Specialization).join(models.UserSpecialization).join(models.UserProfile)
-                            .filter(models.UserSpecialization.user_id == user_id).first())
+    specialization_bond_query = (
+        db.query(models.Specialization.specialization_name)
+        .join(models.UserSpecialization, models.UserSpecialization.specialization_id == models.Specialization.specialization_id)
+        .join(models.UserProfile, models.UserProfile.user_id == models.UserSpecialization.user_id)
+        .filter(models.UserProfile.user_id == user_id)
+        .all()
+    )
     if not specialization_bond_query:
         raise HTTPException(status_code=404, detail='User is not found')
-    return specialization_bond_query
+    specializations = [{"specialization_name": specialization.specialization_name} for specialization in
+                       specialization_bond_query]
+    return {"user_id": user_id, "specializations": specializations}
 
-
+# выводит всех юзеров по определённой специализации
 @app.get("/specialization_users/{specialization_id}")
 async def read_users_by_specialization(specialization_id: int, db: db_dependency):
     specialization_bond_query = (db.query(models.UserProfile).join(models.UserSpecialization).join(models.Specialization)
-                            .filter(models.UserSpecialization.specialization_id == specialization_id).first())
+                            .filter(models.UserSpecialization.specialization_id == specialization_id).all())
     if not specialization_bond_query:
         raise HTTPException(status_code=404, detail='Specialization is not found')
-    return specialization_bond_query
+    users = [{'users_name': users.username} for users in specialization_bond_query]
+    return {"specialization_id": specialization_id, "usernames": users}
 
 
 def delete_users_specialization(db: Session, user_id: int, specialization_id: int):

@@ -20,10 +20,10 @@ class Specialization(Base):
     specialization_name = Column(String, index=True, nullable=False, unique=True)
 
 
-class Tarot_specialization(Base):
-    __tablename__ = 'tarot_specialization'
+class UserSpecialization(Base):
+    __tablename__ = 'user_specialization'
 
-    tarot_specialization_id = Column(Integer, primary_key=True, index=True)
+    user_specialization_id = Column(Integer, primary_key=True, index=True)
     specialization_id = Column(Integer, ForeignKey('specialization.specialization_id'))
     user_id = Column(Integer, ForeignKey('user_profile.user_id'))
 
