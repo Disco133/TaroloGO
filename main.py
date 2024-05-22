@@ -3,6 +3,7 @@ import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, select
 from database import SessionLocal, engine
 from typing import Annotated
 import models
@@ -286,6 +287,7 @@ async def read_specialization_by_user(user_id: int, db: db_dependency):
     specializations = [{"specialization_name": specialization.specialization_name} for specialization in
                        specialization_bond_query]
     return {"user_id": user_id, "specializations": specializations}
+
 
 # выводит всех юзеров по определённой специализации
 @app.get("/specialization_users/{specialization_id}")
