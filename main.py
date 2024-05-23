@@ -34,18 +34,7 @@ class UserOut(BaseModel):
     email: str
     phone_number: str
     date_birth: datetime
-
-
-class UserDateBirthUpdate(BaseModel):
-    date_birth: datetime
-
-
-class UserFirstNameUpdate(BaseModel):
-    first_name: str
-
-
-class UserSecondNameUpdate(BaseModel):
-    second_name: str
+    is_delete: bool
 
 
 #####   ROLE_MODELS   #####
@@ -70,6 +59,30 @@ class SpecCreate(BaseModel):
 class SpecOut(BaseModel):
     specialization_id: int
     specialization_name: str
+
+
+#####   SERVICE_MODELS   #####
+
+
+class ServiceCreate(BaseModel):
+    service_name: str
+    tarot_id: int = Field(..., ge=1)
+    specialization_id: int = Field(..., ge=1)
+    service_price: int
+
+
+class ServiceOut(BaseModel):
+    service_id: int
+    service_name: str
+    service_price: int
+
+
+class ServiceNameUpdate(BaseModel):
+    service_name: str
+
+
+class ServicePriceUpdate(BaseModel):
+    service_price: int
 
 
 #####   SPEC_CONNECTION_MODELS   #####
@@ -190,43 +203,56 @@ async def create_user_endpoint(user: UserCreate, db: db_dependency):
     return db_user
 
 
-# обновление имени в профиле
-@app.post("/users/{user_id}/update_first_name/", response_model=UserOut)
-def update_user_first_name(user_id: int, user_update: UserFirstNameUpdate, db: Session = Depends(get_db)):
+# обновление статуса is_delete
+@app.post("/update_user_is_deleted/{user_id}")
+async def update_user_is_deleted(user_id: int, is_deleted: bool, db: db_dependency):
     db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    db_user.first_name = user_update.first_name
+    db_user.is_deleted = is_deleted
     db.commit()
     db.refresh(db_user)
-    return db_user
+    return {"message": "User is_deleted updated successfully"}
+
+
+# обновление имени в профиле
+@app.post("/update_first_name/{user_id}")
+async def update_user_first_name(user_id: int, first_name: str, db: db_dependency):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.first_name = first_name
+    db.commit()
+    db.refresh(db_user)
+    return {"message": "User first_name updated successfully"}
 
 
 # обновление фамилии в профиле
-@app.post("/users/{user_id}/update_second_name/", response_model=UserOut)
-def update_user_second_name(user_id: int, user_update: UserSecondNameUpdate, db: Session = Depends(get_db)):
+@app.post("/update_second_name/{user_id}")
+async def update_user_second_name(user_id: int, second_name: str, db: db_dependency):
     db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    db_user.second_name = user_update.second_name
+    db_user.second_name = second_name
     db.commit()
     db.refresh(db_user)
-    return db_user
+    return {"message": "User second_name updated successfully"}
 
 
 # обновление даты рождения в профиле
-@app.post("/users/{user_id}/update_date_birth/", response_model=UserOut)
-def update_user_date_birth(user_id: int, user_update: UserDateBirthUpdate, db: Session = Depends(get_db)):
+@app.post("/update_date_birth/{user_id}")
+async def update_date_birth(user_id: int, date_birth: datetime, db: db_dependency):
     db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    db_user.date_birth = user_update.date_birth
+    db_user.date_birth = date_birth
     db.commit()
     db.refresh(db_user)
-    return db_user
+    return {"message": "User date_birth updated successfully"}
 
 
 # юзер по айди
@@ -252,6 +278,91 @@ def delete_user(db: Session, user_id: int):
 @app.delete("/users/{user_id}")
 async def delete_user_endpoint(user_id: int, db: db_dependency):
     return delete_user(db, user_id)
+
+
+###############################
+#           service           #
+###############################
+
+
+# функция создания услуги
+def create_service(db: Session, service: ServiceCreate):
+    # Проверка, что пользователь с указанным tarot_id имеет роль таролога
+    user = db.query(models.UserProfile).filter(models.UserProfile.user_id == service.tarot_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role_id != 2:  # Предполагается, что role_id для таролога равен 1
+        raise HTTPException(status_code=403, detail="User does not have the required role")
+
+    db_service = models.Service(
+        service_name=service.service_name,
+        tarot_id=service.tarot_id,
+        specialization_id=service.specialization_id,
+        service_price=service.service_price
+    )
+    db.add(db_service)
+    db.commit()
+    db.refresh(db_service)
+    return db_service
+
+
+# создание услуги
+@app.post('/service', response_model=ServiceOut)
+async def create_service_endpoint(service: ServiceCreate, db: db_dependency):
+    db_service = create_service(db, service)
+    if db_service is None:
+        raise HTTPException(status_code=400, detail="Service creation failed")
+    return db_service
+
+
+# обновление названия услуги
+@app.post("/update_service_name/{service_id}", response_model=ServiceOut)
+async def update_service_name(service_id: int, service_update: ServiceNameUpdate, db: db_dependency):
+    db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
+    if db_service is None:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    db_service.service_name = service_update.service_name
+    db.commit()
+    db.refresh(db_service)
+    return db_service
+
+
+# обновление цены услуги
+@app.post("/update_service_price/{service_id}", response_model=ServiceOut)
+async def update_service_price(service_id: int, service_update: ServicePriceUpdate, db: db_dependency):
+    db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
+    if db_service is None:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    db_service.service_price = service_update.service_price
+    db.commit()
+    db.refresh(db_service)
+    return db_service
+
+
+# услуга по айди
+@app.get("/service/{service_id}")
+async def read_service(service_id: int, db: db_dependency):
+    service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
+    if not service:
+        raise HTTPException(status_code=404, detail='Role is not found')
+    return service
+
+# функция удаления услуги
+def delete_service(db: Session, service_id: int):
+    service_query = db.query(models.Service).filter(
+        models.Service.service_id == service_id).first()
+    if not service_query:
+        raise HTTPException(status_code=404, detail="Service not found")
+    db.delete(service_query)
+    db.commit()
+    return {"message": "Service deleted successfully"}
+
+# удаление услуги
+@app.delete("/service/{service_id}")
+async def delete_service_endpoint(service_id: int, db: db_dependency):
+    return delete_service(db, service_id)
 
 
 ###############################
@@ -384,7 +495,7 @@ def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate)
     return db_spec_bond
 
 
-# связь юзер - специализация
+# таблица связи юзер-специализация
 @app.post("/specialization_bond", response_model=UserSpecializationOut)
 async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db: db_dependency):
     db_spec_bond = create_specialization_bond(db, spec_bond)
@@ -423,6 +534,7 @@ async def read_users_by_specialization(specialization_id: int, db: db_dependency
     return {"specialization_id": specialization_id, "usernames": users}
 
 
+ # функция удаления связи юзер-специализация
 def delete_users_specialization(db: Session, user_id: int, specialization_id: int):
     user_specialization_query = db.query(models.UserSpecialization).filter(
         models.UserSpecialization.user_id == user_id,
@@ -435,6 +547,7 @@ def delete_users_specialization(db: Session, user_id: int, specialization_id: in
     return {"message": "User's specialization deleted successfully"}
 
 
+# удаление связи юзер-специализация
 @app.delete("/users/{user_id}/specialization/{specialization_id}")
 async def delete_user_specialization_endpoint(user_id: int, specialization_id: int, db: db_dependency):
     return delete_users_specialization(db, user_id, specialization_id)
