@@ -2,9 +2,11 @@ from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy import update, alias
+from sqlalchemy.sql import func
 from database import SessionLocal, engine
-from typing import Annotated
+from typing import Annotated, List
 import models
 import bcrypt
 
@@ -82,6 +84,54 @@ class UserSpecializationOut(BaseModel):
     user_specialization_id: int
     specialization_id: int
     user_id: int
+
+
+#####   MESSAGE   #####
+
+
+class MessageCreate(BaseModel):
+    sender_id: int
+    recipient_id: int
+    message_text: str
+
+
+class MessageRead(BaseModel):
+    sender_id: int
+    recipient_id: int
+    message_date_read: datetime
+
+
+class MessageOut(BaseModel):
+    message_id: int
+    sender_id: int
+    recipient_id: int
+    message_text: str
+    message_date_send: datetime
+
+
+class MessageResponse(BaseModel):
+    message_text: str
+    message_date_send: datetime
+    is_read: bool
+
+
+class MessagesResponse(BaseModel):
+    sent_messages: List[MessageResponse]
+    received_messages: List[MessageResponse]
+
+
+#####   CONTACTS   #####
+
+
+
+class ContactsInfo(BaseModel):
+    username: str
+    message_text: str
+    message_date_send: datetime
+    is_read: bool
+
+class ContactsResponse(BaseModel):
+    messages: List[ContactsInfo]
 
 
 def get_db():
@@ -388,6 +438,210 @@ def delete_users_specialization(db: Session, user_id: int, specialization_id: in
 @app.delete("/users/{user_id}/specialization/{specialization_id}")
 async def delete_user_specialization_endpoint(user_id: int, specialization_id: int, db: db_dependency):
     return delete_users_specialization(db, user_id, specialization_id)
+
+
+###############################
+#           message           #
+###############################
+
+
+# функция для добавления контакта
+def add_contact(db: Session, user_id: int, user_contact_id: int):
+    contact_exists = db.query(models.Contacts).filter_by(user_id=user_id, user_contact_id=user_contact_id).first()
+    if not contact_exists:
+        db_contact = models.Contacts(
+            user_id=user_id,
+            user_contact_id=user_contact_id
+        )
+        db.add(db_contact)
+        db.commit()
+        db.refresh(db_contact)
+
+
+# функция для создания нового сообщения
+def create_message_for_db(db: Session, message: MessageCreate):
+    db_message = models.Message(
+        sender_id=message.sender_id,
+        recipient_id=message.recipient_id,
+        message_text=message.message_text
+    )
+    db.add(db_message)
+    db.commit()
+    db.refresh(db_message)
+
+    add_contact(db, message.sender_id, message.recipient_id)
+    add_contact(db, message.recipient_id, message.sender_id)
+
+    return db_message
+
+
+# запрос для добавления сообщения в базу данных и генерации нового контакта
+@app.post("/new_message", response_model=MessageOut)
+async def create_message(message: MessageCreate, db: db_dependency):
+    db_message = create_message_for_db(db, message)
+    if db_message is None:
+        raise HTTPException(status_code=400, detail="Message creation failed")
+    return db_message
+
+# запрос для помечания сообщения как прочитанного
+@app.post("/message_read/{sender_id}/recipient/{recipient_id}", response_model=MessageRead)
+async def message_read(sender_id: int, recipient_id: int, db: db_dependency):
+    current_time = datetime.now()
+
+    query = (
+        update(models.Message)
+        .filter(
+            models.Message.sender_id == sender_id,
+            models.Message.recipient_id == recipient_id,
+            models.Message.message_date_read == None
+        )
+        .values(message_date_read=current_time)
+        .execution_options(synchronize_session='fetch')
+    )
+
+    result = db.execute(query)
+    db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="No messages found to update")
+
+    return MessageRead(message_date_read=current_time)
+
+
+# функция для получения всей переписки между двумя пользователями
+def get_messages_from_db(db: Session, sender_id: int, recipient_id: int):
+    sent_messages = db.query(models.Message).filter(
+        models.Message.sender_id == sender_id,
+        models.Message.recipient_id == recipient_id
+    ).all()
+
+    received_messages = db.query(models.Message).filter(
+        models.Message.sender_id == recipient_id,
+        models.Message.recipient_id == sender_id
+    ).all()
+
+    if not sent_messages and not received_messages:
+        raise HTTPException(status_code=404, detail="No messages found")
+
+    return {
+        "sent_messages": [
+            MessageResponse(
+                message_text=message.message_text,
+                message_date_send=message.message_date_send,
+                is_read=message.message_date_read is not None
+            ) for message in sent_messages
+        ],
+        "received_messages": [
+            MessageResponse(
+                message_text=message.message_text,
+                message_date_send=message.message_date_send,
+                is_read=message.message_date_read is not None
+            ) for message in received_messages
+        ]
+    }
+
+# запрос для получения переписки между пользователями
+@app.get("/messages/{sender_id}/recipient/{recipient_id}", response_model=MessagesResponse)
+async def get_messages(sender_id: int, recipient_id: int, db: db_dependency):
+    return get_messages_from_db(db, sender_id, recipient_id)
+
+# функция для получения инфорциции (никнейма, последнего отправленного сообщения, даты и времени его отправки и статуса просмотра) каждого контакта для определенного пользователя
+def get_last_messages_from_db(db: Session, user_id: int):
+    sent_messages = aliased(models.Message)
+    received_messages = aliased(models.Message)
+
+    sent_subquery = (
+        db.query(
+            sent_messages.recipient_id.label('contact_id'),
+            sent_messages.message_date_send.label('message_date_send'),
+            sent_messages.message_id.label('message_id')
+        )
+        .filter(sent_messages.sender_id == user_id)
+    )
+
+    received_subquery = (
+        db.query(
+            received_messages.sender_id.label('contact_id'),
+            received_messages.message_date_send.label('message_date_send'),
+            received_messages.message_id.label('message_id')
+        )
+        .filter(received_messages.recipient_id == user_id)
+    )
+
+    union_subquery = sent_subquery.union_all(received_subquery).subquery()
+
+    last_messages_subquery = (
+        db.query(
+            union_subquery.c.contact_id,
+            func.max(union_subquery.c.message_date_send).label('last_date')
+        )
+        .group_by(union_subquery.c.contact_id)
+        .subquery()
+    )
+
+    last_messages = (
+        db.query(
+            models.Message.message_id,
+            models.Message.sender_id,
+            models.Message.recipient_id,
+            models.Message.message_text,
+            models.Message.message_date_send,
+            models.Message.message_date_read,
+            models.UserProfile.username
+        )
+        .join(
+            last_messages_subquery,
+            (models.Message.message_date_send == last_messages_subquery.c.last_date) &
+            ((models.Message.sender_id == last_messages_subquery.c.contact_id) |
+             (models.Message.recipient_id == last_messages_subquery.c.contact_id))
+        )
+        .join(
+            models.UserProfile,
+            (models.UserProfile.user_id == models.Message.sender_id) |
+            (models.UserProfile.user_id == models.Message.recipient_id)
+        )
+        .filter(
+            (models.UserProfile.user_id != user_id)
+        )
+        .order_by(models.Message.message_date_send.desc())
+        .all()
+    )
+
+    if not last_messages:
+        raise HTTPException(status_code=404, detail="No messages found")
+
+    return [
+        ContactsInfo(
+            username=message.username,
+            message_text=message.message_text,
+            message_date_send=message.message_date_send,
+            is_read=message.message_date_read is not None
+        )
+        for message in last_messages
+    ]
+
+# запрос для получения никнейма, последнего отправленного сообщения, даты и времени его отправки и статуса просмотра каждого контакта для определенного пользователя
+@app.get("/contacts/{user_id}", response_model=List[ContactsInfo])
+async def get_last_message(user_id: int, db: Session = Depends(get_db)):
+    return get_last_messages_from_db(db, user_id)
+
+# функция для удаления сообщения
+def delete_message_from_db(db: Session, sender_id: int, recipient_id: int, message_date_send: datetime):
+    message_query = db.query(models.Message).filter(
+        models.Message.sender_id == sender_id,
+        models.Message.recipient_id == recipient_id,
+        models.Message.message_date_send == message_date_send).first()
+    if not message_query:
+        raise HTTPException(status_code=404, detail="Message not found")
+    db.delete(message_query)
+    db.commit()
+    return {"message": "Message deleted successfully"}
+
+
+# запрос на удаление сообщения
+@app.delete("/message_delete/{sender_id}/recipient_id/{recipient_id}/message_date_send/{message_date_send}")
+async def delete_message(sender_id: int, recipient_id: int, message_date_send: datetime, db: db_dependency):
+    return delete_message_from_db(db, sender_id, recipient_id, message_date_send)
 
 
 # автоматический запуск uvicorn

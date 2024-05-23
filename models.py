@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, DateTime, Float, func
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, DateTime, Float, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -18,6 +18,32 @@ class Specialization(Base):
 
     specialization_id = Column(Integer, primary_key=True, index=True)
     specialization_name = Column(String, index=True, nullable=False, unique=True)
+
+
+class Message(Base):
+    __tablename__ = 'message'
+
+    message_id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    recipient_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    message_text = Column(String, index=True)
+    message_date_send = Column(DateTime, nullable=False, default=func.now())
+    message_date_read = Column(DateTime)
+
+    sender = relationship("UserProfile", foreign_keys=[sender_id])
+    recipient = relationship("UserProfile", foreign_keys=[recipient_id])
+
+
+class Contacts(Base):
+    __tablename__ = 'contacts'
+
+    contact_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    user_contact_id = Column(Integer, ForeignKey('user_profile.user_id'))
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'user_contact_id', name='_user_contact_uc'),
+    )
 
 
 class UserSpecialization(Base):
