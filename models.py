@@ -1,14 +1,25 @@
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, DateTime, Float, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
+class UserFavoriteTarots(Base):
+    __tablename__ = 'user_favorite_tarots'
+
+    favorite_tarot_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    tarot_id = Column(Integer, ForeignKey('user_profile.user_id'))
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'tarot_id', name='user_favorite_tarots_uc'),
+    )
 
 
 class Service(Base):
     __tablename__ = 'service'
 
     service_id = Column(Integer, primary_key=True, index=True)
-    tarot_id = Column(Integer, ForeignKey('user_profile.user_id', ondelete='CASCADE'))
+    tarot_id = Column(Integer, ForeignKey('user_profile.user_id'))
     service_name = Column(String, index=True, nullable=False, unique=True)
+    service_description = Column(String, nullable=True)
     specialization_id = Column(Integer, ForeignKey('specialization.specialization_id', ondelete='CASCADE'))
     service_price = Column(Integer, nullable=False)
 
@@ -46,12 +57,12 @@ class Contacts(Base):
     )
 
 
-class UserSpecialization(Base):
-    __tablename__ = 'user_specialization'
+class TarotSpecialization(Base):
+    __tablename__ = 'tarot_specialization'
 
-    user_specialization_id = Column(Integer, primary_key=True, index=True)
+    tarot_specialization_id = Column(Integer, primary_key=True, index=True)
     specialization_id = Column(Integer, ForeignKey('specialization.specialization_id'))
-    user_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    tarot_id = Column(Integer, ForeignKey('user_profile.user_id'))
 
 
 class Role(Base):
@@ -77,6 +88,6 @@ class UserProfile(Base):
     date_registration = Column(DateTime, nullable=False, default=func.now())
     is_deleted = Column(Boolean, default=False, nullable=False)
     # profile_picture = Column(String, nullable=True)
-    # tarot_description = Column(String, nullable=True)
-    # tarot_experience = Column(Float, nullable=True)
+    tarot_description = Column(String, nullable=True)
+    tarot_experience = Column(Float, nullable=True)
     # tarot_rating = Column(Float, nullable=True)

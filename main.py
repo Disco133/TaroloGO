@@ -34,7 +34,6 @@ class UserOut(BaseModel):
     email: str
     phone_number: str
     date_birth: datetime
-    is_delete: bool
 
 
 #####   ROLE_MODELS   #####
@@ -88,18 +87,18 @@ class ServicePriceUpdate(BaseModel):
 #####   SPEC_CONNECTION_MODELS   #####
 
 
-class UserSpecializationCreate(BaseModel):
+class TarotSpecializationCreate(BaseModel):
     specialization_id: int
-    user_id: int
+    tarot_id: int
 
 
-class UserSpecializationOut(BaseModel):
-    user_specialization_id: int
+class TarotSpecializationOut(BaseModel):
+    tarot_specialization_id: int
     specialization_id: int
-    user_id: int
+    tarot_id: int
 
 
-#####   MESSAGE   #####
+#####   MESSAGE_MODELS   #####
 
 
 class MessageCreate(BaseModel):
@@ -133,8 +132,7 @@ class MessagesResponse(BaseModel):
     received_messages: List[MessageResponse]
 
 
-#####   CONTACTS   #####
-
+#####   CONTACTS_MODELS   #####
 
 
 class ContactsInfo(BaseModel):
@@ -143,8 +141,22 @@ class ContactsInfo(BaseModel):
     message_date_send: datetime
     is_read: bool
 
+
 class ContactsResponse(BaseModel):
     messages: List[ContactsInfo]
+
+
+#####   USER_FAVORITE_TAROTS_MODELS    #####
+
+class UserFavoriteTarotsCreate(BaseModel):
+    user_id: int
+    tarot_id: int
+
+
+class UserFavoriteTarotsOut(BaseModel):
+    favorite_tarot_id: int
+    user_id: int
+    tarot_id: int
 
 
 def get_db():
@@ -255,21 +267,49 @@ async def update_date_birth(user_id: int, date_birth: datetime, db: db_dependenc
     return {"message": "User date_birth updated successfully"}
 
 
+# обновление описания таролога
+@app.post("/update_tarot_description/{user_id}")
+async def update_tarot_description(user_id: int, tarot_description: str, db: db_dependency):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.role_id != 1:  # Предполагается, что role_id для таролога равен 1
+        raise HTTPException(status_code=403, detail="User does not have the required role")
+    db_user.tarot_description = tarot_description
+    db.commit()
+    db.refresh(db_user)
+    return {"message": "User tarot_description updated successfully"}
+
+
+# обновление опыта работы таролога
+@app.post("/update_tarot_experience/{user_id}")
+async def update_tarot_experience(user_id: int, tarot_experience: float, db: db_dependency):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.role_id != 1:  # Предполагается, что role_id для таролога равен 1
+        raise HTTPException(status_code=403, detail="User does not have the required role")
+    db_user.tarot_experience = tarot_experience
+    db.commit()
+    db.refresh(db_user)
+    return {"message": "User tarot_experience updated successfully"}
+
+
 # юзер по айди
 @app.get("/users/{user_id}")
 async def read_user(user_id: int, db: db_dependency):
-    user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
-    if not user:
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if not db_user:
         raise HTTPException(status_code=404, detail='user is not found')
-    return user
+    return db_user
 
 
 # функция для удаления юзера
 def delete_user(db: Session, user_id: int):
-    user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
-    if not user:
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+    if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
-    db.delete(user)
+    db.delete(db_user)
     db.commit()
     return {"message": "User deleted successfully"}
 
@@ -288,10 +328,10 @@ async def delete_user_endpoint(user_id: int, db: db_dependency):
 # функция создания услуги
 def create_service(db: Session, service: ServiceCreate):
     # Проверка, что пользователь с указанным tarot_id имеет роль таролога
-    user = db.query(models.UserProfile).filter(models.UserProfile.user_id == service.tarot_id).first()
-    if user is None:
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == service.tarot_id).first()
+    if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if user.role_id != 2:  # Предполагается, что role_id для таролога равен 1
+    if db_user.role_id != 1:  # Предполагается, что role_id для таролога равен 1
         raise HTTPException(status_code=403, detail="User does not have the required role")
 
     db_service = models.Service(
@@ -341,13 +381,27 @@ async def update_service_price(service_id: int, service_update: ServicePriceUpda
     return db_service
 
 
+#обновление описания услуги
+@app.post("/update_service_description/{service_id}")
+async def update_service_description(service_id: int, service_description: str, db: db_dependency):
+    db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
+    if db_service is None:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    db_service.service_description = service_description
+    db.commit()
+    db.refresh(db_service)
+    return {"message": "Service description updated successfully"}
+
+
 # услуга по айди
 @app.get("/service/{service_id}")
 async def read_service(service_id: int, db: db_dependency):
-    service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
-    if not service:
+    db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
+    if not db_service:
         raise HTTPException(status_code=404, detail='Role is not found')
-    return service
+    return db_service
+
 
 # функция удаления услуги
 def delete_service(db: Session, service_id: int):
@@ -358,6 +412,7 @@ def delete_service(db: Session, service_id: int):
     db.delete(service_query)
     db.commit()
     return {"message": "Service deleted successfully"}
+
 
 # удаление услуги
 @app.delete("/service/{service_id}")
@@ -483,11 +538,16 @@ async def delete_specialization_endpoint(specialization_id: int, db: db_dependen
 ###############################
 
 
-# Функция для создания связи юзер - специализация
-def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate):
-    db_spec_bond = models.UserSpecialization(
+# Функция для создания связи таролог - специализация
+def create_specialization_bond(db: Session, spec_bond: TarotSpecializationCreate):
+    db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == spec_bond.tarot_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.role_id != 1:  # Предполагается, что role_id для таролога равен 1
+        raise HTTPException(status_code=403, detail="User does not have the required role")
+    db_spec_bond = models.TarotSpecialization(
         specialization_id=spec_bond.specialization_id,
-        user_id=spec_bond.user_id
+        tarot_id=spec_bond.tarot_id
     )
     db.add(db_spec_bond)
     db.commit()
@@ -496,61 +556,61 @@ def create_specialization_bond(db: Session, spec_bond: UserSpecializationCreate)
 
 
 # таблица связи юзер-специализация
-@app.post("/specialization_bond", response_model=UserSpecializationOut)
-async def create_specialization_endpoint(spec_bond: UserSpecializationCreate, db: db_dependency):
+@app.post("/specialization_bond", response_model=TarotSpecializationOut)
+async def create_specialization_endpoint(spec_bond: TarotSpecializationCreate, db: db_dependency):
     db_spec_bond = create_specialization_bond(db, spec_bond)
     if db_spec_bond is None:
         raise HTTPException(status_code=400, detail="Specialization bond creation failed")
     return db_spec_bond
 
 
-# выводит все специализации определённого юзера
-@app.get("/user_specialization/{user_id}")
-async def read_specialization_by_user(user_id: int, db: db_dependency):
+# выводит все специализации определённого таролога
+@app.get("/tarot_specialization/{tarot_id}")
+async def read_specialization_by_tarot(tarot_id: int, db: db_dependency):
     specialization_bond_query = (
         db.query(models.Specialization.specialization_name)
-        .join(models.UserSpecialization,
-              models.UserSpecialization.specialization_id == models.Specialization.specialization_id)
-        .join(models.UserProfile, models.UserProfile.user_id == models.UserSpecialization.user_id)
-        .filter(models.UserProfile.user_id == user_id)
+        .join(models.TarotSpecialization,
+              models.TarotSpecialization.specialization_id == models.Specialization.specialization_id)
+        .join(models.UserProfile, models.UserProfile.user_id == models.TarotSpecialization.tarot_id)
+        .filter(models.UserProfile.user_id == tarot_id)
         .all()
     )
     if not specialization_bond_query:
-        raise HTTPException(status_code=404, detail='User is not found')
+        raise HTTPException(status_code=404, detail='Tarot is not found')
     specializations = [{"specialization_name": specialization.specialization_name} for specialization in
                        specialization_bond_query]
-    return {"user_id": user_id, "specializations": specializations}
+    return {"tarot_id": tarot_id, "specializations": specializations}
 
 
-# выводит всех юзеров по определённой специализации
-@app.get("/specialization_users/{specialization_id}")
-async def read_users_by_specialization(specialization_id: int, db: db_dependency):
+# выводит всех тарологов по определённой специализации
+@app.get("/specialization_tarot/{specialization_id}")
+async def read_tarot_by_specialization(specialization_id: int, db: db_dependency):
     specialization_bond_query = (
-        db.query(models.UserProfile).join(models.UserSpecialization).join(models.Specialization)
-        .filter(models.UserSpecialization.specialization_id == specialization_id).all())
+        db.query(models.UserProfile).join(models.TarotSpecialization).join(models.Specialization)
+        .filter(models.TarotSpecialization.specialization_id == specialization_id).all())
     if not specialization_bond_query:
         raise HTTPException(status_code=404, detail='Specialization is not found')
-    users = [{'users_name': users.username} for users in specialization_bond_query]
-    return {"specialization_id": specialization_id, "usernames": users}
+    tarots = [{'tarots_name': tarots.username} for tarots in specialization_bond_query]
+    return {"specialization_id": specialization_id, "usernames": tarots}
 
 
- # функция удаления связи юзер-специализация
-def delete_users_specialization(db: Session, user_id: int, specialization_id: int):
-    user_specialization_query = db.query(models.UserSpecialization).filter(
-        models.UserSpecialization.user_id == user_id,
-        models.UserSpecialization.specialization_id == specialization_id)
-    user_specialization_query = user_specialization_query.first()
-    if not user_specialization_query:
-        raise HTTPException(status_code=404, detail="User/Specialization not found")
-    db.delete(user_specialization_query)
+# функция удаления связи таролог-специализация
+def delete_tarots_specialization(db: Session, tarot_id: int, specialization_id: int):
+    tarot_specialization_query = db.query(models.TarotSpecialization).filter(
+        models.TarotSpecialization.tarot_id == tarot_id,
+        models.TarotSpecialization.specialization_id == specialization_id)
+    tarot_specialization_query = tarot_specialization_query.first()
+    if not tarot_specialization_query:
+        raise HTTPException(status_code=404, detail="Tarot/Specialization not found")
+    db.delete(tarot_specialization_query)
     db.commit()
-    return {"message": "User's specialization deleted successfully"}
+    return {"message": "Tarot's specialization deleted successfully"}
 
 
-# удаление связи юзер-специализация
-@app.delete("/users/{user_id}/specialization/{specialization_id}")
-async def delete_user_specialization_endpoint(user_id: int, specialization_id: int, db: db_dependency):
-    return delete_users_specialization(db, user_id, specialization_id)
+# удаление связи таролог-специализация
+@app.delete("/tarots/{tarot_id}/specialization/{specialization_id}")
+async def delete_tarot_specialization_endpoint(tarot_id: int, specialization_id: int, db: db_dependency):
+    return delete_tarots_specialization(db, tarot_id, specialization_id)
 
 
 ###############################
@@ -595,6 +655,7 @@ async def create_message(message: MessageCreate, db: db_dependency):
     if db_message is None:
         raise HTTPException(status_code=400, detail="Message creation failed")
     return db_message
+
 
 # запрос для помечания сообщения как прочитанного
 @app.post("/message_read/{sender_id}/recipient/{recipient_id}", response_model=MessageRead)
@@ -653,10 +714,12 @@ def get_messages_from_db(db: Session, sender_id: int, recipient_id: int):
         ]
     }
 
+
 # запрос для получения переписки между пользователями
 @app.get("/messages/{sender_id}/recipient/{recipient_id}", response_model=MessagesResponse)
 async def get_messages(sender_id: int, recipient_id: int, db: db_dependency):
     return get_messages_from_db(db, sender_id, recipient_id)
+
 
 # функция для получения инфорциции (никнейма, последнего отправленного сообщения, даты и времени его отправки и статуса просмотра) каждого контакта для определенного пользователя
 def get_last_messages_from_db(db: Session, user_id: int):
@@ -733,10 +796,12 @@ def get_last_messages_from_db(db: Session, user_id: int):
         for message in last_messages
     ]
 
+
 # запрос для получения никнейма, последнего отправленного сообщения, даты и времени его отправки и статуса просмотра каждого контакта для определенного пользователя
 @app.get("/contacts/{user_id}", response_model=List[ContactsInfo])
 async def get_last_message(user_id: int, db: Session = Depends(get_db)):
     return get_last_messages_from_db(db, user_id)
+
 
 # функция для удаления сообщения
 def delete_message_from_db(db: Session, sender_id: int, recipient_id: int, message_date_send: datetime):
@@ -755,6 +820,65 @@ def delete_message_from_db(db: Session, sender_id: int, recipient_id: int, messa
 @app.delete("/message_delete/{sender_id}/recipient_id/{recipient_id}/message_date_send/{message_date_send}")
 async def delete_message(sender_id: int, recipient_id: int, message_date_send: datetime, db: db_dependency):
     return delete_message_from_db(db, sender_id, recipient_id, message_date_send)
+
+
+###############################
+#          Favorite           #
+###############################
+
+
+# функция добавление таролога в избранные
+def create_user_favorite_tarot(db: Session, favorite: UserFavoriteTarotsCreate):
+    db_favorite = models.UserFavoriteTarots(
+        user_id=favorite.user_id,
+        tarot_id=favorite.tarot_id
+    )
+    db.add(db_favorite)
+    db.commit()
+    db.refresh(db_favorite)
+    return db_favorite
+
+
+# добавление таролога в избранные
+@app.post("/user_favorite_tarot", response_model=UserFavoriteTarotsOut)
+async def create_user_favorite_tarot_endpoint(favorite: UserFavoriteTarotsCreate, db: db_dependency):
+    db_favorite = create_user_favorite_tarot(db, favorite)
+    if db_favorite is None:
+        raise HTTPException(status_code=400, detail="Role creation failed")
+    return db_favorite
+
+
+# функция получения всех тарологов в избранных у пользователя
+def get_user_favorite_tarots(db: Session, user_id: int):
+    return db.query(models.UserFavoriteTarots).filter(models.UserFavoriteTarots.user_id == user_id).all()
+
+
+# получение всех тарологов в избранных у пользователя
+@app.get('/user_favorite_tarot/{user_id}', response_model=List[UserFavoriteTarotsOut])
+async def read_user_favorite_tarots(user_id: int, db: db_dependency):
+    favorites = get_user_favorite_tarots(db, user_id)
+    if not favorites:
+        raise HTTPException(status_code=404, detail="No favorites found for this user")
+    return favorites
+
+
+#функция для удаления таролога из избранных
+def delete_user_favorite_tarot(db: Session, user_id: int, tarot_id: int):
+    favorite_query = db.query(models.UserFavoriteTarots).filter(
+        models.UserFavoriteTarots.user_id == user_id,
+        models.UserFavoriteTarots.user_id == user_id)
+    favorite_query = favorite_query.first()
+    if not favorite_query:
+        raise HTTPException(status_code=404, detail="Favorite not found")
+    db.delete(favorite_query)
+    db.commit()
+    return {"message": "Favorite tarot deleted successfully"}
+
+
+# удаление таролога из избранных
+@app.delete("/users_favorite_tarot/{user_id}/{tarot_id}")
+async def delete_user_favorite_tarot_endpoint(user_id: int, tarot_id: int, db: db_dependency):
+    return delete_user_favorite_tarot(db, user_id, tarot_id)
 
 
 # автоматический запуск uvicorn
