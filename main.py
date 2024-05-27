@@ -195,13 +195,50 @@ class UserServiceHistoryOut(BaseModel):
     status_id: int
 
 
-
 class UserServiceHistoryUpdateReview(BaseModel):
     history_id: int
     review_title: str
     review_text: str
     review_value: int = Field(..., le=5, ge=1)
     review_date_time: datetime
+
+
+#####   NOTIFICATIONS_MODELS    #####
+
+
+class SystemNotificationCreate(BaseModel):
+    notification_status_id: int
+    notification_type_id: int
+    notification_title: str
+    notification_text: str
+    notification_date_time: datetime
+
+
+class SystemNotificationOut(BaseModel):
+    notification_id: int
+    notification_status_id: int
+    notification_type_id: int
+    notification_title: str
+    notification_text: str
+    notification_date_time: datetime
+
+
+class NotificationStatusCreate(BaseModel):
+    notification_status_name: str
+
+
+class NotificationTypeCreate(BaseModel):
+    notification_type_name: str
+
+
+class NotificationStatusOut(BaseModel):
+    notification_type_id: int
+    notification_type_name: str
+
+
+class NotificationTypeOut(BaseModel):
+    notification_status_id: int
+    notification_status_name: str
 
 
 def get_db():
@@ -966,7 +1003,7 @@ def delete_status(db: Session, status_id: int):
 
 
 # удаление статуса
-@app.delete("/status/{status_id}")
+@app.delete("/delete_status/{status_id}")
 async def delete_status_endpoint(status_id: int, db: db_dependency):
     return delete_status(db, status_id)
 
@@ -1049,6 +1086,160 @@ async def read_user_service_history(history_id: int, db: db_dependency):
     if not history_query:
         raise HTTPException(status_code=404, detail='History is not found')
     return history_query
+
+
+###############################
+#       Notification_st       #
+###############################
+
+
+# функция для создания статуса уведомления
+def create_notification_status(db: Session, stat: NotificationStatusCreate):
+    db_stat = models.NotificationStatus(
+        notification_status_name=stat.status_name
+    )
+    db.add(db_stat)
+    db.commit()
+    db.refresh(db_stat)
+    return db_stat
+
+
+# создание статуса уведомления
+@app.post("/notification_status", response_model=NotificationStatusOut)
+async def create_notification_status_endpoint(stat: NotificationStatusCreate, db: db_dependency):
+    db_status = create_notification_status(db, stat)
+    if db_status is None:
+        raise HTTPException(status_code=400, detail="Notification status creation failed")
+    return db_status
+
+
+# название статуса уведомления по его айди
+@app.get("/notification_status/{notification_status_id}")
+async def read_notification_status(notification_status_id: int, db: db_dependency):
+    notification_status_query = db.query(models.NotificationStatus).filter(models.NotificationStatus.notification_status_id == notification_status_id).first()
+    if not notification_status_query:
+        raise HTTPException(status_code=404, detail='Notification Status is not found')
+    return notification_status_query
+
+
+# функция для удаления статуса уведомления
+def delete_notification_status(db: Session, notification_status_id: int):
+    notification_status_query = db.query(models.NotificationStatus).filter(models.NotificationStatus.notification_status_id == notification_status_id).first()
+    if not notification_status_query:
+        raise HTTPException(status_code=404, detail="Notification status not found")
+    db.delete(notification_status_query)
+    db.commit()
+    return {"message": "Notification status deleted successfully"}
+
+
+# удаление статуса уведомления
+@app.delete("/delete_status/{notification_status_id}")
+async def delete_notification_status_endpoint(notification_status_id: int, db: db_dependency):
+    return delete_notification_status(db, notification_status_id)
+
+
+###############################
+#      Notification_type      #
+###############################
+
+
+# функция для создания типа уведомления
+def create_notification_type(db: Session, n_type: NotificationTypeCreate):
+    db_type = models.NotificationType(
+        notification_type_name=n_type.type_name
+    )
+    db.add(db_type)
+    db.commit()
+    db.refresh(db_type)
+    return db_type
+
+
+# создание статуса
+@app.post("/notification_type", response_model=NotificationTypeOut)
+async def create_notification_type_endpoint(n_type: NotificationTypeCreate, db: db_dependency):
+    db_type = create_notification_type(db, n_type)
+    if db_type is None:
+        raise HTTPException(status_code=400, detail="Notification type creation failed")
+    return db_type
+
+
+# название статуса по его айди
+@app.get("/notification_type/{notification_type_id}")
+async def read_notification_status(notification_type_id: int, db: db_dependency):
+    notification_type_query = db.query(models.NotificationType).filter(models.NotificationType.notification_type_id == notification_type_id).first()
+    if not notification_type_query:
+        raise HTTPException(status_code=404, detail='Notification type is not found')
+    return notification_type_query
+
+
+# функция для удаления статуса
+def delete_notification_type(db: Session, notification_type_id: int):
+    notification_type_query = db.query(models.NotificationType).filter(models.NotificationType.notification_type_id == notification_type_id).first()
+    if not notification_type_query:
+        raise HTTPException(status_code=404, detail="Notification type not found")
+    db.delete(notification_type_query)
+    db.commit()
+    return {"message": "Notification type deleted successfully"}
+
+
+# удаление статуса
+@app.delete("/delete_type/{notification_type_id}")
+async def delete_notification_type_endpoint(notification_type_id: int, db: db_dependency):
+    return delete_notification_type(db, notification_type_id)
+
+
+###############################
+#     System_notification     #
+###############################
+
+
+# функция для создания уведомления
+def create_notification(db: Session, notification: SystemNotificationCreate):
+    db_notification = models.SystemNotification(
+        notification_status_id = notification.notification_status_id,
+        notification_type_id = notification.notification_type_id,
+        notification_title = notification.notification_title,
+        notification_text = notification.notification_text,
+        notification_date_time = notification.notification_date_time
+    )
+    db.add(db_notification)
+    db.commit()
+    db.refresh(db_notification)
+    return db_notification
+
+
+# создание уведомления
+@app.post("/notification", response_model=SystemNotificationOut)
+async def create_notification_endpoint(notification: SystemNotificationCreate, db: db_dependency):
+    db_notification = create_notification(db, notification)
+    if db_notification is None:
+        raise HTTPException(status_code=400, detail="Notification creation failed")
+    return db_notification
+
+
+# название статуса по его айди
+@app.get("/notification/{notification_id}")
+async def read_notification(notification_id: int, db: db_dependency):
+    notification_query = db.query(models.SystemNotification).filter(models.SystemNotification.notification_id == notification_id).first()
+    if not notification_query:
+        raise HTTPException(status_code=404, detail='Notification is not found')
+    return notification_query
+
+
+# функция для удаления Уведомления
+def delete_notification(db: Session, notification_id: int):
+    notification_query = db.query(models.SystemNotification).filter(models.SystemNotification.notification_id == notification_id).first()
+    if not notification_query:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.delete(notification_query)
+    db.commit()
+    return {"message": "Notification deleted successfully"}
+
+
+# удаление статуса
+@app.delete("/delete_notification/{notification_id}")
+async def delete_notification_endpoint(notification_id: int, db: db_dependency):
+    return delete_notification(db, notification_id)
 
 
 # автоматический запуск uvicorn

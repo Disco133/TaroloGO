@@ -15,6 +15,31 @@ class UserFavoriteTarots(Base):
     )
 
 
+class NotificationStatus(Base):
+    __tablename__ = 'notification_status'
+
+    notification_status_id = Column(Integer, primary_key=True, index=True)
+    notification_status_name = Column(String, nullable=False)
+
+
+class NotificationType(Base):
+    __tablename__ = 'notification_type'
+
+    notification_type_id = Column(Integer, primary_key=True, index=True)
+    notification_type_name = Column(String, nullable=False)
+
+
+class SystemNotification(Base):
+    __tablename__ = 'system_notification'
+
+    notification_id = Column(Integer, primary_key=True, index=True)
+    notification_status_id = Column(Integer, ForeignKey('notification_status.notification_status_id'))
+    notification_type_id = Column(Integer, ForeignKey('notification_type.notification_type_id'))
+    notification_title = Column(String, index=True)
+    notification_text = Column(String, index=True)
+    notification_date_time = Column(DateTime, nullable=False, default=func.now())
+
+
 class Service(Base):
     __tablename__ = 'service'
 
