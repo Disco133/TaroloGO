@@ -19,14 +19,14 @@ class NotificationStatus(Base):
     __tablename__ = 'notification_status'
 
     notification_status_id = Column(Integer, primary_key=True, index=True)
-    notification_status_name = Column(String, nullable=False)
+    notification_status_name = Column(String, index=True)
 
 
 class NotificationType(Base):
-    __tablename__ = 'notification_type'
+    __tablename__ = "notification_type"
 
     notification_type_id = Column(Integer, primary_key=True, index=True)
-    notification_type_name = Column(String, nullable=False)
+    notification_type_name = Column(String, index=True)
 
 
 class SystemNotification(Base):

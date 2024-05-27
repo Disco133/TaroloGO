@@ -232,13 +232,13 @@ class NotificationTypeCreate(BaseModel):
 
 
 class NotificationStatusOut(BaseModel):
-    notification_type_id: int
-    notification_type_name: str
+    notification_status_id: int
+    notification_status_name: str
 
 
 class NotificationTypeOut(BaseModel):
-    notification_status_id: int
-    notification_status_name: str
+    notification_type_id: int
+    notification_type_name: str
 
 
 def get_db():
@@ -1096,7 +1096,7 @@ async def read_user_service_history(history_id: int, db: db_dependency):
 # функция для создания статуса уведомления
 def create_notification_status(db: Session, stat: NotificationStatusCreate):
     db_stat = models.NotificationStatus(
-        notification_status_name=stat.status_name
+        notification_status_name=stat.notification_status_name
     )
     db.add(db_stat)
     db.commit()
@@ -1133,7 +1133,7 @@ def delete_notification_status(db: Session, notification_status_id: int):
 
 
 # удаление статуса уведомления
-@app.delete("/delete_status/{notification_status_id}")
+@app.delete("/delete_notification_status/{notification_status_id}")
 async def delete_notification_status_endpoint(notification_status_id: int, db: db_dependency):
     return delete_notification_status(db, notification_status_id)
 
@@ -1146,7 +1146,7 @@ async def delete_notification_status_endpoint(notification_status_id: int, db: d
 # функция для создания типа уведомления
 def create_notification_type(db: Session, n_type: NotificationTypeCreate):
     db_type = models.NotificationType(
-        notification_type_name=n_type.type_name
+        notification_type_name=n_type.notification_type_name
     )
     db.add(db_type)
     db.commit()
@@ -1154,7 +1154,7 @@ def create_notification_type(db: Session, n_type: NotificationTypeCreate):
     return db_type
 
 
-# создание статуса
+# создание типа уведомления
 @app.post("/notification_type", response_model=NotificationTypeOut)
 async def create_notification_type_endpoint(n_type: NotificationTypeCreate, db: db_dependency):
     db_type = create_notification_type(db, n_type)
@@ -1163,7 +1163,7 @@ async def create_notification_type_endpoint(n_type: NotificationTypeCreate, db: 
     return db_type
 
 
-# название статуса по его айди
+# название типа уведомления по его айди
 @app.get("/notification_type/{notification_type_id}")
 async def read_notification_status(notification_type_id: int, db: db_dependency):
     notification_type_query = db.query(models.NotificationType).filter(models.NotificationType.notification_type_id == notification_type_id).first()
@@ -1172,7 +1172,7 @@ async def read_notification_status(notification_type_id: int, db: db_dependency)
     return notification_type_query
 
 
-# функция для удаления статуса
+# функция для удаления типа уведомления
 def delete_notification_type(db: Session, notification_type_id: int):
     notification_type_query = db.query(models.NotificationType).filter(models.NotificationType.notification_type_id == notification_type_id).first()
     if not notification_type_query:
@@ -1182,7 +1182,7 @@ def delete_notification_type(db: Session, notification_type_id: int):
     return {"message": "Notification type deleted successfully"}
 
 
-# удаление статуса
+# удаление типа уведомления
 @app.delete("/delete_type/{notification_type_id}")
 async def delete_notification_type_endpoint(notification_type_id: int, db: db_dependency):
     return delete_notification_type(db, notification_type_id)
@@ -1217,7 +1217,7 @@ async def create_notification_endpoint(notification: SystemNotificationCreate, d
     return db_notification
 
 
-# название статуса по его айди
+# название уведомления по его айди
 @app.get("/notification/{notification_id}")
 async def read_notification(notification_id: int, db: db_dependency):
     notification_query = db.query(models.SystemNotification).filter(models.SystemNotification.notification_id == notification_id).first()
@@ -1236,7 +1236,7 @@ def delete_notification(db: Session, notification_id: int):
     return {"message": "Notification deleted successfully"}
 
 
-# удаление статуса
+# удаление уведомления
 @app.delete("/delete_notification/{notification_id}")
 async def delete_notification_endpoint(notification_id: int, db: db_dependency):
     return delete_notification(db, notification_id)
