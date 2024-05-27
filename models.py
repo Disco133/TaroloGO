@@ -1,6 +1,8 @@
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, DateTime, Float, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
+
+
 class UserFavoriteTarots(Base):
     __tablename__ = 'user_favorite_tarots'
 
@@ -88,6 +90,30 @@ class UserProfile(Base):
     date_registration = Column(DateTime, nullable=False, default=func.now())
     is_deleted = Column(Boolean, default=False, nullable=False)
     # profile_picture = Column(String, nullable=True)
-    tarot_description = Column(String, nullable=True)
+    user_description = Column(String, nullable=True)
     tarot_experience = Column(Float, nullable=True)
     # tarot_rating = Column(Float, nullable=True)
+
+
+class Status(Base):
+    __tablename__ = 'status'
+
+    status_id = Column(Integer, primary_key=True, index=True)
+    status_name = Column(String, index=True, nullable=False, unique=True)
+
+
+class UserServiceHistory(Base):
+    __tablename__ = 'user_service_history'
+
+    history_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('user_profile.user_id', ondelete='CASCADE'))
+    service_id = Column(Integer, ForeignKey('service.service_id', ondelete='CASCADE'))
+    tarot_id = Column(Integer, unique=False, nullable=False, index=True)
+    status_begin_datetime = Column(DateTime, nullable=False, default=func.now()) # обновлять когда отправляется пост запрос на обновление статуса
+    status_end_datetime = Column(DateTime, nullable=False,
+                                 default=func.now())  # обновлять когда отправляется гет запрос на обновление статуса
+    status_id = Column(Integer, ForeignKey('status.status_id', ondelete='CASCADE'))
+    review_title = Column(String, nullable=True)
+    review_text = Column(String, nullable=True)
+    review_value = Column(Integer, nullable=True)
+    review_date_time = Column(DateTime, nullable=True, default=func.now())

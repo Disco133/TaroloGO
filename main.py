@@ -159,6 +159,51 @@ class UserFavoriteTarotsOut(BaseModel):
     tarot_id: int
 
 
+#####   STATUS_MODELS    #####
+
+
+class StatusCreate(BaseModel):
+    status_name: str
+
+
+class StatusOut(BaseModel):
+    status_id: int
+    status_name: str
+
+
+#####   USER_SERVICE_HISTORY_MODELS    #####
+
+
+class UserServiceHistoryCreate(BaseModel):
+    user_id: int
+    service_id: int
+    #status_begin_datetime: datetime
+    #status_end_datetime: datetime
+    status_id: int
+    #review_title: str
+    #review_text: str
+    #review_value: int = Field(..., ge=1, le=5)
+    #review_date_time: datetime
+
+
+class UserServiceHistoryOut(BaseModel):
+    history_id: int
+    user_id: int
+    service_id: int
+    #status_begin_datetime: datetime
+    #status_end_datetime: datetime
+    status_id: int
+
+
+
+class UserServiceHistoryUpdateReview(BaseModel):
+    history_id: int
+    review_title: str
+    review_text: str
+    review_value: int = Field(..., le=5, ge=1)
+    review_date_time: datetime
+
+
 def get_db():
     db = SessionLocal()  # создаём сессию базы данных
     try:
@@ -268,17 +313,13 @@ async def update_date_birth(user_id: int, date_birth: datetime, db: db_dependenc
 
 
 # обновление описания таролога
-@app.post("/update_tarot_description/{user_id}")
-async def update_tarot_description(user_id: int, tarot_description: str, db: db_dependency):
+@app.post("/update_user_description/{user_id}")
+async def update_user_description(user_id: int, user_description: str, db: db_dependency):
     db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    if db_user.role_id != 1:  # Предполагается, что role_id для таролога равен 1
-        raise HTTPException(status_code=403, detail="User does not have the required role")
-    db_user.tarot_description = tarot_description
+    db_user.user_description = user_description
     db.commit()
     db.refresh(db_user)
-    return {"message": "User tarot_description updated successfully"}
+    return {"message": "User description updated successfully"}
 
 
 # обновление опыта работы таролога
@@ -300,7 +341,7 @@ async def update_tarot_experience(user_id: int, tarot_experience: float, db: db_
 async def read_user(user_id: int, db: db_dependency):
     db_user = db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
     if not db_user:
-        raise HTTPException(status_code=404, detail='user is not found')
+        raise HTTPException(status_code=404, detail='User is not found')
     return db_user
 
 
@@ -879,6 +920,135 @@ def delete_user_favorite_tarot(db: Session, user_id: int, tarot_id: int):
 @app.delete("/users_favorite_tarot/{user_id}/{tarot_id}")
 async def delete_user_favorite_tarot_endpoint(user_id: int, tarot_id: int, db: db_dependency):
     return delete_user_favorite_tarot(db, user_id, tarot_id)
+
+
+###############################
+#            Status           #
+###############################
+
+# функция для создания статуса
+def create_status(db: Session, stat: StatusCreate):
+    db_stat = models.Status(
+        status_name=stat.status_name
+    )
+    db.add(db_stat)
+    db.commit()
+    db.refresh(db_stat)
+    return db_stat
+
+
+# создание статуса
+@app.post("/status", response_model=StatusOut)
+async def create_status_endpoint(stat: StatusCreate, db: db_dependency):
+    db_status = create_status(db, stat)
+    if db_status is None:
+        raise HTTPException(status_code=400, detail="Status creation failed")
+    return db_status
+
+
+# название статуса по его айди
+@app.get("/status/{status_id}")
+async def read_status(status_id: int, db: db_dependency):
+    status_query = db.query(models.Status).filter(models.Status.status_id == status_id).first()
+    if not status_query:
+        raise HTTPException(status_code=404, detail='Status is not found')
+    return status_query
+
+
+# функция для удаления статуса
+def delete_status(db: Session, status_id: int):
+    status_query = db.query(models.Status).filter(models.Status.status_id == status_id).first()
+    if not status_query:
+        raise HTTPException(status_code=404, detail="Status not found")
+    db.delete(status_query)
+    db.commit()
+    return {"message": "Status deleted successfully"}
+
+
+# удаление статуса
+@app.delete("/status/{status_id}")
+async def delete_status_endpoint(status_id: int, db: db_dependency):
+    return delete_status(db, status_id)
+
+
+# функция создание истории
+def create_history(db: Session, history: UserServiceHistoryCreate):\
+    # Поиск службы по service_id
+    service = db.query(models.Service).filter(models.Service.service_id == history.service_id).first()
+
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    db_history = models.UserServiceHistory(
+        user_id=history.user_id,
+        service_id=history.service_id,
+        tarot_id=service.tarot_id,
+        #status_begin_datetime=history.status_begin_datetime,
+        #status_end_datetime=history.status_end_datetime,
+        status_id=history.status_id
+    )
+    db.add(db_history)
+    db.commit()
+    db.refresh(db_history)
+    return db_history
+
+
+# создание истории
+@app.post("/history", response_model=UserServiceHistoryOut)
+async def create_user_endpoint(history: UserServiceHistoryCreate, db: db_dependency):
+    db_history = create_history(db, history)
+    if db_history is None:
+        raise HTTPException(status_code=400, detail="History creation failed")
+    return db_history
+
+
+# функция обновления отзыва
+def update_review(db: Session, history_update: UserServiceHistoryUpdateReview):
+    db_history = db.query(models.UserServiceHistory).filter(
+        models.UserServiceHistory.history_id == history_update.history_id).first()
+
+    if not db_history:
+        raise HTTPException(status_code=404, detail="History record not found")
+
+    db_history.review_title = history_update.review_title
+    db_history.review_text = history_update.review_text
+    db_history.review_value = history_update.review_value
+    db_history.review_date_time = datetime.utcnow()
+    db.commit()
+    db.refresh(db_history)
+    return db_history
+
+
+# обновление отзыва
+@app.post("/update_review/{history_id}", response_model=UserServiceHistoryOut)
+async def update_review_endpoint(history_update: UserServiceHistoryUpdateReview, db: db_dependency):
+    updated_history = update_review(db, history_update)
+    return updated_history
+
+
+# обновление статуса услуги
+@app.post("/update_service_status/{history_id}")
+async def update_service_status(history_id: int, status_id: int, db: db_dependency):
+    db_history = db.query(models.UserServiceHistory).filter(models.UserServiceHistory.history_id == history_id).first()
+    if db_history is None:
+        raise HTTPException(status_code=404, detail="History record not found")
+    db_service_status = db.query(models.Status).filter(
+        models.Status.status_id == status_id).first()
+    if db_service_status is None:
+        raise HTTPException(status_code=404, detail="Status not found")
+    db_history.status_id = status_id
+    db.commit()
+    db.refresh( db_service_status)
+    return {"message": "Status updated successfully"}
+
+
+#вывод user_service_history
+@app.get("/user_service_history/{history_id}")
+async def read_user_service_history(history_id: int, db: db_dependency):
+    history_query = db.query(models.UserServiceHistory).filter(
+        models.UserServiceHistory.history_id == history_id).first()
+    if not history_query:
+        raise HTTPException(status_code=404, detail='History is not found')
+    return history_query
 
 
 # автоматический запуск uvicorn
