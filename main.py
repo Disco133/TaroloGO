@@ -177,21 +177,13 @@ class StatusOut(BaseModel):
 class UserServiceHistoryCreate(BaseModel):
     user_id: int
     service_id: int
-    #status_begin_datetime: datetime
-    #status_end_datetime: datetime
     status_id: int
-    #review_title: str
-    #review_text: str
-    #review_value: int = Field(..., ge=1, le=5)
-    #review_date_time: datetime
 
 
 class UserServiceHistoryOut(BaseModel):
     history_id: int
     user_id: int
     service_id: int
-    #status_begin_datetime: datetime
-    #status_end_datetime: datetime
     status_id: int
 
 
@@ -459,7 +451,7 @@ async def update_service_price(service_id: int, service_update: ServicePriceUpda
     return db_service
 
 
-#обновление описания услуги
+# обновление описания услуги
 @app.post("/update_service_description/{service_id}")
 async def update_service_description(service_id: int, service_description: str, db: db_dependency):
     db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
@@ -940,7 +932,7 @@ async def read_user_favorite_tarots(user_id: int, db: db_dependency):
     return favorites
 
 
-#функция для удаления таролога из избранных
+# функция для удаления таролога из избранных
 def delete_user_favorite_tarot(db: Session, user_id: int, tarot_id: int):
     favorite_query = db.query(models.UserFavoriteTarots).filter(
         models.UserFavoriteTarots.user_id == user_id,
@@ -1008,9 +1000,14 @@ async def delete_status_endpoint(status_id: int, db: db_dependency):
     return delete_status(db, status_id)
 
 
+###############################
+#      UserServiceHistory     #
+###############################
+
+
 # функция создание истории
-def create_history(db: Session, history: UserServiceHistoryCreate):\
-    # Поиск службы по service_id
+def create_history(db: Session, history: UserServiceHistoryCreate): \
+        # Поиск службы по service_id
     service = db.query(models.Service).filter(models.Service.service_id == history.service_id).first()
 
     if not service:
@@ -1019,8 +1016,6 @@ def create_history(db: Session, history: UserServiceHistoryCreate):\
         user_id=history.user_id,
         service_id=history.service_id,
         tarot_id=service.tarot_id,
-        #status_begin_datetime=history.status_begin_datetime,
-        #status_end_datetime=history.status_end_datetime,
         status_id=history.status_id
     )
     db.add(db_history)
@@ -1046,13 +1041,52 @@ def update_review(db: Session, history_update: UserServiceHistoryUpdateReview):
     if not db_history:
         raise HTTPException(status_code=404, detail="History record not found")
 
+    old_review_value = db_history.review_value
     db_history.review_title = history_update.review_title
     db_history.review_text = history_update.review_text
     db_history.review_value = history_update.review_value
     db_history.review_date_time = datetime.utcnow()
+
+    tarot_id = db_history.tarot_id
+    update_tarot_rating(db, tarot_id, old_review_value, history_update.review_value)
+
     db.commit()
     db.refresh(db_history)
+
     return db_history
+
+
+# функция обновления рейтинга таролога при добавлении новой оценки
+def update_tarot_rating(db: Session, tarot_id: int, old_review_value: int, new_review_value: int):
+    tarot_profile = db.query(models.UserProfile).filter(models.UserProfile.user_id == tarot_id).first()
+
+    if not tarot_profile:
+        raise HTTPException(status_code=404, detail="Tarot profile not found")
+
+    # Получаем текущие значения средней оценки и количество отзывов с review_value != 0
+    current_reviews_query = db.query(models.UserServiceHistory).filter(
+        models.UserServiceHistory.tarot_id == tarot_id,
+        models.UserServiceHistory.review_value != 0
+    )
+
+    current_reviews_count = current_reviews_query.count()
+    print(current_reviews_count)
+    if current_reviews_count == 0:
+        tarot_profile.tarot_rating = new_review_value if new_review_value != 0 else None
+    else:
+        # Пересчитываем сумму всех отзывов с review_value != 0
+        current_reviews_sum = sum(review.review_value for review in current_reviews_query.all())
+
+        # Обновляем сумму с учетом нового и старого значения review_value
+        new_reviews_sum = current_reviews_sum - old_review_value + new_review_value
+
+        # Пересчитываем среднюю оценку
+        new_rating = new_reviews_sum / (current_reviews_count + 1)
+
+        # Обновляем среднюю оценку таролога в таблице UserProfile
+        tarot_profile.tarot_rating = new_rating
+
+    db.commit()
 
 
 # обновление отзыва
@@ -1074,11 +1108,11 @@ async def update_service_status(history_id: int, status_id: int, db: db_dependen
         raise HTTPException(status_code=404, detail="Status not found")
     db_history.status_id = status_id
     db.commit()
-    db.refresh( db_service_status)
+    db.refresh(db_service_status)
     return {"message": "Status updated successfully"}
 
 
-#вывод user_service_history
+# вывод user_service_history
 @app.get("/user_service_history/{history_id}")
 async def read_user_service_history(history_id: int, db: db_dependency):
     history_query = db.query(models.UserServiceHistory).filter(
@@ -1116,7 +1150,8 @@ async def create_notification_status_endpoint(stat: NotificationStatusCreate, db
 # название статуса уведомления по его айди
 @app.get("/notification_status/{notification_status_id}")
 async def read_notification_status(notification_status_id: int, db: db_dependency):
-    notification_status_query = db.query(models.NotificationStatus).filter(models.NotificationStatus.notification_status_id == notification_status_id).first()
+    notification_status_query = db.query(models.NotificationStatus).filter(
+        models.NotificationStatus.notification_status_id == notification_status_id).first()
     if not notification_status_query:
         raise HTTPException(status_code=404, detail='Notification Status is not found')
     return notification_status_query
@@ -1124,7 +1159,8 @@ async def read_notification_status(notification_status_id: int, db: db_dependenc
 
 # функция для удаления статуса уведомления
 def delete_notification_status(db: Session, notification_status_id: int):
-    notification_status_query = db.query(models.NotificationStatus).filter(models.NotificationStatus.notification_status_id == notification_status_id).first()
+    notification_status_query = db.query(models.NotificationStatus).filter(
+        models.NotificationStatus.notification_status_id == notification_status_id).first()
     if not notification_status_query:
         raise HTTPException(status_code=404, detail="Notification status not found")
     db.delete(notification_status_query)
@@ -1166,7 +1202,8 @@ async def create_notification_type_endpoint(n_type: NotificationTypeCreate, db: 
 # название типа уведомления по его айди
 @app.get("/notification_type/{notification_type_id}")
 async def read_notification_status(notification_type_id: int, db: db_dependency):
-    notification_type_query = db.query(models.NotificationType).filter(models.NotificationType.notification_type_id == notification_type_id).first()
+    notification_type_query = db.query(models.NotificationType).filter(
+        models.NotificationType.notification_type_id == notification_type_id).first()
     if not notification_type_query:
         raise HTTPException(status_code=404, detail='Notification type is not found')
     return notification_type_query
@@ -1174,7 +1211,8 @@ async def read_notification_status(notification_type_id: int, db: db_dependency)
 
 # функция для удаления типа уведомления
 def delete_notification_type(db: Session, notification_type_id: int):
-    notification_type_query = db.query(models.NotificationType).filter(models.NotificationType.notification_type_id == notification_type_id).first()
+    notification_type_query = db.query(models.NotificationType).filter(
+        models.NotificationType.notification_type_id == notification_type_id).first()
     if not notification_type_query:
         raise HTTPException(status_code=404, detail="Notification type not found")
     db.delete(notification_type_query)
@@ -1196,11 +1234,11 @@ async def delete_notification_type_endpoint(notification_type_id: int, db: db_de
 # функция для создания уведомления
 def create_notification(db: Session, notification: SystemNotificationCreate):
     db_notification = models.SystemNotification(
-        notification_status_id = notification.notification_status_id,
-        notification_type_id = notification.notification_type_id,
-        notification_title = notification.notification_title,
-        notification_text = notification.notification_text,
-        notification_date_time = notification.notification_date_time
+        notification_status_id=notification.notification_status_id,
+        notification_type_id=notification.notification_type_id,
+        notification_title=notification.notification_title,
+        notification_text=notification.notification_text,
+        notification_date_time=notification.notification_date_time
     )
     db.add(db_notification)
     db.commit()
@@ -1220,7 +1258,8 @@ async def create_notification_endpoint(notification: SystemNotificationCreate, d
 # название уведомления по его айди
 @app.get("/notification/{notification_id}")
 async def read_notification(notification_id: int, db: db_dependency):
-    notification_query = db.query(models.SystemNotification).filter(models.SystemNotification.notification_id == notification_id).first()
+    notification_query = db.query(models.SystemNotification).filter(
+        models.SystemNotification.notification_id == notification_id).first()
     if not notification_query:
         raise HTTPException(status_code=404, detail='Notification is not found')
     return notification_query
@@ -1228,7 +1267,8 @@ async def read_notification(notification_id: int, db: db_dependency):
 
 # функция для удаления Уведомления
 def delete_notification(db: Session, notification_id: int):
-    notification_query = db.query(models.SystemNotification).filter(models.SystemNotification.notification_id == notification_id).first()
+    notification_query = db.query(models.SystemNotification).filter(
+        models.SystemNotification.notification_id == notification_id).first()
     if not notification_query:
         raise HTTPException(status_code=404, detail="Notification not found")
     db.delete(notification_query)

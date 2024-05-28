@@ -116,8 +116,8 @@ class UserProfile(Base):
     is_deleted = Column(Boolean, default=False, nullable=False)
     # profile_picture = Column(String, nullable=True)
     user_description = Column(String, nullable=True)
-    tarot_experience = Column(Float, nullable=True)
-    # tarot_rating = Column(Float, nullable=True)
+    # tarot_experience = Column(Float, nullable=True)
+    tarot_rating = Column(Float, nullable=True, default=0)
 
 
 class Status(Base):
@@ -134,11 +134,8 @@ class UserServiceHistory(Base):
     user_id = Column(Integer, ForeignKey('user_profile.user_id', ondelete='CASCADE'))
     service_id = Column(Integer, ForeignKey('service.service_id', ondelete='CASCADE'))
     tarot_id = Column(Integer, unique=False, nullable=False, index=True)
-    status_begin_datetime = Column(DateTime, nullable=False, default=func.now()) # обновлять когда отправляется пост запрос на обновление статуса
-    status_end_datetime = Column(DateTime, nullable=False,
-                                 default=func.now())  # обновлять когда отправляется гет запрос на обновление статуса
     status_id = Column(Integer, ForeignKey('status.status_id', ondelete='CASCADE'))
     review_title = Column(String, nullable=True)
     review_text = Column(String, nullable=True)
-    review_value = Column(Integer, nullable=True)
+    review_value = Column(Integer, nullable=True, default=0)
     review_date_time = Column(DateTime, nullable=True, default=func.now())
