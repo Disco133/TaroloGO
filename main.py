@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import update, alias
+from sqlalchemy import update, delete, asc
 from sqlalchemy.sql import func
 from database import SessionLocal, engine
 from typing import Annotated, List
@@ -238,6 +238,29 @@ class UserSystemNotificationOut(BaseModel):
 class NotificationByUserOut(BaseModel):
     notification_title: str
     notification_text: str
+
+
+#####   FEEDBACK_MODELS    #####
+
+
+class FeedbackCreate(BaseModel):
+    user_id: int
+    feedback_text: str
+    feedback_datetime: datetime
+
+
+class FeedbackOut(BaseModel):
+    feedback_id: int
+    user_id: int
+    feedback_text: str
+    feedback_datetime: datetime
+    is_read: bool
+
+
+class FeedbackRead(BaseModel):
+    feedback_id: int
+    feedback_text: str
+    is_read: bool
 
 
 def get_db():
@@ -1344,6 +1367,71 @@ async def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No notifications found for this user")
 
     return user_notifications
+
+
+###############################
+#          feedback           #
+###############################
+
+
+def create_feedback(db: Session, feedback: FeedbackCreate):
+    # Check if the user_id exists in the user_profile table
+    user_profile = db.query(models.UserProfile).filter(models.UserProfile.user_id == feedback.user_id).first()
+    if not user_profile:
+        raise HTTPException(status_code=404, detail="User ID not found")
+
+    db_feedback = models.Feedback(
+        user_id=feedback.user_id,
+        feedback_text=feedback.feedback_text,
+        feedback_datetime=feedback.feedback_datetime,
+        is_read=False
+    )
+    db.add(db_feedback)
+    db.commit()
+    db.refresh(db_feedback)
+    return db_feedback
+
+
+# создание уведомления
+@app.post("/feedback", response_model=FeedbackOut)
+async def create_feedback_endpoint(feedback: FeedbackCreate, db: db_dependency):
+    db_feedback = create_feedback(db, feedback)
+    if db_feedback is None:
+        raise HTTPException(status_code=400, detail="Feedback creation failed")
+    return db_feedback
+
+
+
+@app.post("/feedback/mark_oldest_unread_as_read", response_model=FeedbackRead)
+async def mark_oldest_unread_as_read(db: Session = Depends(get_db)):
+    feedback_query = db.query(models.Feedback).filter(models.Feedback.is_read== False).order_by(asc(models.Feedback.feedback_datetime)).first()
+
+    if not feedback_query:
+        raise HTTPException(status_code=404, detail="No unread feedback found")
+
+    # Обновляем поле is_read на True
+    feedback_query.is_read = True
+    db.commit()
+    db.refresh(feedback_query)
+
+    return FeedbackRead(feedback_id=feedback_query.feedback_id, feedback_text = feedback_query.feedback_text, is_read=feedback_query.is_read)
+
+
+@app.delete("/feedback/delete_old_read")
+async def delete_old_read_feedbacks(db: Session = Depends(get_db)):
+    fourteen_days_ago = datetime.now() - timedelta(days=14)
+
+    # Удаляем записи
+    delete_query = (
+        delete(models.Feedback)
+        .where(models.Feedback.is_read == True)
+        .where(models.Feedback.feedback_datetime < fourteen_days_ago)
+    )
+
+    result = db.execute(delete_query)
+    db.commit()
+
+    return {"deleted_rows": result.rowcount}
 
 
 # автоматический запуск uvicorn

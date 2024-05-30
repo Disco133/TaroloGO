@@ -131,8 +131,8 @@ class UserServiceHistory(Base):
     __tablename__ = 'user_service_history'
 
     history_id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('user_profile.user_id', ondelete='CASCADE'))
-    service_id = Column(Integer, ForeignKey('service.service_id', ondelete='CASCADE'))
+    user_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    service_id = Column(Integer, ForeignKey('service.service_id'))
     tarot_id = Column(Integer, unique=False, nullable=False, index=True)
     status_id = Column(Integer, ForeignKey('status.status_id', ondelete='CASCADE'))
     review_title = Column(String, nullable=True)
@@ -152,3 +152,12 @@ class UserSystemNotification(Base):
         UniqueConstraint('user_id', 'notification_id', name='_user_notification_uc'),
     )
 
+
+class Feedback(Base):
+    __tablename__ = 'feedback'
+
+    feedback_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    feedback_text = Column(String, index=True)
+    feedback_datetime = Column(DateTime, nullable=False, default=func.now())
+    is_read = Column(Boolean, default=None)
