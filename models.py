@@ -161,3 +161,5 @@ class Feedback(Base):
     feedback_text = Column(String, index=True)
     feedback_datetime = Column(DateTime, nullable=False, default=func.now())
     is_read = Column(Boolean, default=None)
+
+# <3

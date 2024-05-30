@@ -1417,6 +1417,7 @@ async def mark_oldest_unread_as_read(db: Session = Depends(get_db)):
     return FeedbackRead(feedback_id=feedback_query.feedback_id, feedback_text = feedback_query.feedback_text, is_read=feedback_query.is_read)
 
 
+# удаление фитбэка
 @app.delete("/feedback/delete_old_read")
 async def delete_old_read_feedbacks(db: Session = Depends(get_db)):
     fourteen_days_ago = datetime.now() - timedelta(days=14)
@@ -1442,3 +1443,5 @@ if __name__ == "__main__":
         port=8000,
         reload=True
     )
+
+# <3
