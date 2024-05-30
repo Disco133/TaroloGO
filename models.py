@@ -116,7 +116,7 @@ class UserProfile(Base):
     is_deleted = Column(Boolean, default=False, nullable=False)
     # profile_picture = Column(String, nullable=True)
     user_description = Column(String, nullable=True)
-    # tarot_experience = Column(Float, nullable=True)
+    tarot_experience = Column(Float, nullable=True)
     tarot_rating = Column(Float, nullable=True, default=0)
 
 
@@ -139,3 +139,16 @@ class UserServiceHistory(Base):
     review_text = Column(String, nullable=True)
     review_value = Column(Integer, nullable=True, default=0)
     review_date_time = Column(DateTime, nullable=True, default=func.now())
+
+
+class UserSystemNotification(Base):
+    __tablename__ = 'user_system_notification'
+
+    user_notification_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('user_profile.user_id'))
+    notification_id = Column(Integer, ForeignKey('system_notification.notification_id'))
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'notification_id', name='_user_notification_uc'),
+    )
+

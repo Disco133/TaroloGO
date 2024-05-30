@@ -76,14 +76,6 @@ class ServiceOut(BaseModel):
     service_price: int
 
 
-class ServiceNameUpdate(BaseModel):
-    service_name: str
-
-
-class ServicePriceUpdate(BaseModel):
-    service_price: int
-
-
 #####   SPEC_CONNECTION_MODELS   #####
 
 
@@ -231,6 +223,21 @@ class NotificationStatusOut(BaseModel):
 class NotificationTypeOut(BaseModel):
     notification_type_id: int
     notification_type_name: str
+
+
+class UserSystemNotificationCreate(BaseModel):
+    user_id: int
+    notification_id: int
+
+
+class UserSystemNotificationOut(BaseModel):
+    user_id: int
+    notification_id: int
+
+
+class NotificationByUserOut(BaseModel):
+    notification_title: str
+    notification_text: str
 
 
 def get_db():
@@ -426,29 +433,29 @@ async def create_service_endpoint(service: ServiceCreate, db: db_dependency):
 
 
 # обновление названия услуги
-@app.post("/update_service_name/{service_id}", response_model=ServiceOut)
-async def update_service_name(service_id: int, service_update: ServiceNameUpdate, db: db_dependency):
+@app.post("/update_service_name/{service_id}")
+async def update_service_name(service_id: int, service_name: str, db: db_dependency):
     db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
     if db_service is None:
         raise HTTPException(status_code=404, detail="Service not found")
 
-    db_service.service_name = service_update.service_name
+    db_service.service_name = service_name
     db.commit()
     db.refresh(db_service)
-    return db_service
+    return {"message": "Service name updated successfully"}
 
 
 # обновление цены услуги
-@app.post("/update_service_price/{service_id}", response_model=ServiceOut)
-async def update_service_price(service_id: int, service_update: ServicePriceUpdate, db: db_dependency):
+@app.post("/update_service_price/{service_id}")
+async def update_service_price(service_id: int, service_price: int, db: db_dependency):
     db_service = db.query(models.Service).filter(models.Service.service_id == service_id).first()
     if db_service is None:
         raise HTTPException(status_code=404, detail="Service not found")
 
-    db_service.service_price = service_update.service_price
+    db_service.service_price = service_price
     db.commit()
     db.refresh(db_service)
-    return db_service
+    return {"message": "Service price updated successfully"}
 
 
 # обновление описания услуги
@@ -1280,6 +1287,63 @@ def delete_notification(db: Session, notification_id: int):
 @app.delete("/delete_notification/{notification_id}")
 async def delete_notification_endpoint(notification_id: int, db: db_dependency):
     return delete_notification(db, notification_id)
+
+
+###############################
+#      user_notification      #
+###############################
+
+
+# Function to create a notification bond for a list of users
+def create_user_notifications_bond(db: Session, user_ids: List[int], notification_id: int):
+    db_user_notifications = [
+        models.UserSystemNotification(user_id=user_id, notification_id=notification_id)
+        for user_id in user_ids
+    ]
+    db.bulk_save_objects(db_user_notifications)
+    db.commit()
+    return db_user_notifications
+
+
+# Endpoint to create notification for all users or users with a specific role
+@app.post("/user_notification/{role_id}", response_model=List[SystemNotificationOut])
+async def create_user_notification(role_id: int, notification_id: int, db: Session = Depends(get_db)):
+    if role_id == 0:
+        # Get all users
+        users = db.query(models.UserProfile).all()
+    else:
+        # Get users with the specific role
+        users = db.query(models.UserProfile).filter(models.UserProfile.role_id == role_id).all()
+
+    if not users:
+        raise HTTPException(status_code=404, detail="No users found")
+
+    user_ids = [user.user_id for user in users]
+    db_user_notifications = create_user_notifications_bond(db, user_ids, notification_id)
+
+    if not db_user_notifications:
+        raise HTTPException(status_code=400, detail="Failed to create notifications")
+
+    return db_user_notifications
+
+
+@app.get("/user/{user_id}/notifications", response_model=List[NotificationByUserOut])
+async def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
+    user_notifications = db.query(
+        models.
+        models.SystemNotification.notification_title,
+        models.SystemNotification.notification_text
+    ).join(
+        models.UserSystemNotification,
+        models.UserSystemNotification.notification_id == models.SystemNotification.notification_id
+    ).filter(
+        models.UserSystemNotification.user_id == user_id
+    ).all()
+
+    if not user_notifications:
+        raise HTTPException(status_code=404, detail="No notifications found for this user")
+
+    return user_notifications
 
 
 # автоматический запуск uvicorn
