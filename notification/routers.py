@@ -125,14 +125,17 @@ async def delete_notification_type_endpoint(notification_type_id: int, session: 
 ###############################
 
 
-# функция для создания уведомления
+# Функция для создания уведомления
 async def create_notification(notification: SystemNotificationCreate, session: AsyncSession = Depends(get_session)):
+    # Преобразование datetime в безвременную зону
+    notification_datetime = notification.notification_date_time.replace(tzinfo=None)
+
     db_notification = SystemNotification(
         notification_status_id=notification.notification_status_id,
         notification_type_id=notification.notification_type_id,
         notification_title=notification.notification_title,
         notification_text=notification.notification_text,
-        notification_date_time=notification.notification_date_time
+        notification_date_time=notification_datetime
     )
     session.add(db_notification)
     await session.commit()
@@ -140,9 +143,10 @@ async def create_notification(notification: SystemNotificationCreate, session: A
     return db_notification
 
 
-# создание уведомления
+# Создание уведомления
 @router.post("/create_notification", response_model=SystemNotificationOut)
-async def create_notification_endpoint(notification: SystemNotificationCreate, session: AsyncSession = Depends(get_session)):
+async def create_notification_endpoint(notification: SystemNotificationCreate,
+                                       session: AsyncSession = Depends(get_session)):
     db_notification = await create_notification(notification, session)
     if db_notification is None:
         raise HTTPException(status_code=400, detail="Notification creation failed")

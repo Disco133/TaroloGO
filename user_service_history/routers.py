@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import aliased
 from user.models import UserProfile
+from status.models import Status
 from service.models import Service
 from user_service_history.models import UserServiceHistory
 from database import get_session
@@ -127,6 +128,7 @@ async def update_service_status(history_id: int, status_id: int, session: AsyncS
 async def read_user_service_history(history_id: int, session: AsyncSession = Depends(get_session)):
     history_query = await session.execute(select(UserServiceHistory).filter(
         UserServiceHistory.history_id == history_id))
-    if not history_query:
+    history = history_query.scalars().first()
+    if not history:
         raise HTTPException(status_code=404, detail='History is not found')
-    return history_query
+    return history

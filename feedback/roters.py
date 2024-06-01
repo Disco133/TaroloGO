@@ -15,16 +15,21 @@ router = APIRouter(
     tags=['Feedback']
 )
 
+
 async def create_feedback(feedback: FeedbackCreate, session: AsyncSession = Depends(get_session)):
-    # Check if the user_id exists in the user_profile table
+    # Проверяем, существует ли user_id в таблице user_profile
     create_feedback_query = await session.execute(select(UserProfile).filter(UserProfile.user_id == feedback.user_id))
     db_create_feedback = create_feedback_query.scalars().first()
     if not db_create_feedback:
         raise HTTPException(status_code=404, detail="User ID not found")
+
+    # Преобразование datetime в безвременную зону
+    feedback_datetime = feedback.feedback_datetime.replace(tzinfo=None)
+
     db_feedback = Feedback(
         user_id=feedback.user_id,
         feedback_text=feedback.feedback_text,
-        feedback_datetime=feedback.feedback_datetime,
+        feedback_datetime=feedback_datetime,
         is_read=False
     )
     session.add(db_feedback)
@@ -33,7 +38,7 @@ async def create_feedback(feedback: FeedbackCreate, session: AsyncSession = Depe
     return db_feedback
 
 
-# создание уведомления
+# Создание отзыва
 @router.post("/create", response_model=FeedbackOut)
 async def create_feedback_endpoint(feedback: FeedbackCreate, session: AsyncSession = Depends(get_session)):
     db_feedback = await create_feedback(feedback, session)

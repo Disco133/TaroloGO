@@ -101,7 +101,6 @@ async def get_messages(sender_id: int, recipient_id: int, session: AsyncSession 
     return await get_messages_from_db(sender_id, recipient_id, session)
 
 
-# Асинхронная функция для получения информации о последних сообщениях для пользователя
 async def get_last_messages_from_db(user_id: int, session: AsyncSession = Depends(get_session)):
     sent_messages = aliased(Message)
     received_messages = aliased(Message)
@@ -110,7 +109,8 @@ async def get_last_messages_from_db(user_id: int, session: AsyncSession = Depend
         select(
             sent_messages.recipient_id.label('contact_id'),
             sent_messages.message_date_send.label('message_date_send'),
-            sent_messages.message_id.label('message_id')
+            sent_messages.message_id.label('message_id'),
+            sent_messages.sender_id.label('sender_id')
         )
         .filter(sent_messages.sender_id == user_id)
     )
@@ -119,7 +119,8 @@ async def get_last_messages_from_db(user_id: int, session: AsyncSession = Depend
         select(
             received_messages.sender_id.label('contact_id'),
             received_messages.message_date_send.label('message_date_send'),
-            received_messages.message_id.label('message_id')
+            received_messages.message_id.label('message_id'),
+            received_messages.sender_id.label('sender_id')
         )
         .filter(received_messages.recipient_id == user_id)
     )
@@ -141,7 +142,10 @@ async def get_last_messages_from_db(user_id: int, session: AsyncSession = Depend
             Message.recipient_id,
             Message.message_text,
             Message.message_date_send,
-            UserProfile.username
+            UserProfile.user_id.label('companion_id'),
+            UserProfile.username,
+            UserProfile.first_name,
+            UserProfile.second_name
         )
         .join(
             last_messages_subquery,
@@ -166,20 +170,40 @@ async def get_last_messages_from_db(user_id: int, session: AsyncSession = Depend
     if not last_messages:
         raise HTTPException(status_code=404, detail="No messages found")
 
+    # Словарь для хранения последних сообщений для каждого контакта
+    last_messages_dict = {}
+
+    # Поиск самого последнего сообщения для каждого контакта
+    for message in last_messages:
+        contact_id = message.companion_id
+        if contact_id not in last_messages_dict:
+            last_messages_dict[contact_id] = message
+        else:
+            # Если сообщение уже есть, сравниваем даты и обновляем, если это более позднее сообщение
+            if message.message_date_send > last_messages_dict[contact_id].message_date_send:
+                last_messages_dict[contact_id] = message
+
+    # Возвращаем только последние сообщения для каждого контакта
     return [
         ContactsInfo(
+            companion_id=message.companion_id,
             username=message.username,
+            first_name=message.first_name,
+            second_name=message.second_name,
+            sender_id=message.sender_id,
             message_text=message.message_text,
             message_date_send=message.message_date_send,
         )
-        for message in last_messages
+        for message in last_messages_dict.values()
     ]
+
 
 
 # запрос для получения никнейма, последнего отправленного сообщения, даты и времени его отправки и статуса просмотра каждого контакта для определенного пользователя
 @router.get("/contacts_info/{user_id}", response_model=List[ContactsInfo])
 async def get_last_message(user_id: int, session: AsyncSession = Depends(get_session)):
     return await get_last_messages_from_db(user_id, session)
+
 
 
 # Асинхронная функция для удаления сообщения

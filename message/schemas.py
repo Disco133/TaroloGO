@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
+
 from pydantic import BaseModel
 
 
@@ -36,7 +37,11 @@ class MessagesResponses(BaseModel):
 
 
 class ContactsInfo(BaseModel):
+    companion_id: int
     username: str
+    first_name: Optional[str]
+    second_name: Optional[str]
+    sender_id: int
     message_text: str
     message_date_send: datetime
 
