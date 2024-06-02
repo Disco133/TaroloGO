@@ -1,19 +1,15 @@
 from datetime import datetime
-from typing import List
-
+import time
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from favorite.models import UserFavoriteTarots
-from favorite.schemas import UserFavoriteTarotsOut
 from user.models import UserProfile
 from user.schemas import UserCreate, UserOut
 from database import get_session
 from favorite.routers import read_user_favorite_tarots
 from message.routers import get_last_message
+from fastapi_cache.decorator import cache
 
 router = APIRouter(
     prefix='/user',
@@ -89,6 +85,7 @@ async def update_user_first_name(user_id: int, first_name: str, session: AsyncSe
 
     return {"message": "User first_name updated successfully"}
 
+
 # обновление фамилии в профиле
 @router.post("/update_second_name/{user_id}")
 async def update_user_second_name(user_id: int, second_name: str, session: AsyncSession = Depends(get_session)):
@@ -163,61 +160,6 @@ async def read_user(user_id: int, session: AsyncSession = Depends(get_session)):
     return db_user
 
 
-
-async def authenticate_user(email: str, password: str, session: AsyncSession = Depends(get_session)):
-    # Получаем данные пользователя по email
-    user = await session.execute(select(UserProfile).filter(UserProfile.email == email))
-    db_user = user.scalars().first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail='Неправильные email или пароль')
-
-    # Проверяем введенный пароль с хешированным паролем из базы данных
-    if not await verify_password(password, db_user.password_hashed):
-        raise HTTPException(status_code=401, detail='Неправильные email или пароль')
-
-    return db_user
-
-
-# вывод всех тарологов
-@router.get('/find_tarot')
-async def read_tarot(session: AsyncSession = Depends(get_session)):
-    read_tarot_query = await session.execute(select(UserProfile).filter(UserProfile.role_id == 1))
-    db_users = read_tarot_query.scalars().all()
-    if not db_users:
-        raise HTTPException(status_code=404, detail='Tarot is not found')
-
-    tarots = []
-    for user in db_users:
-        tarot_info = {
-            'tarot_id': user.user_id,
-            'first_name': user.first_name,
-            'second_name': user.second_name,
-            'tarot_description': user.user_description,
-            'tarot_rating': user.tarot_rating,
-            'reviews_count': 0  # по умолчанию количество отзывов 0
-        }
-        tarots.append(tarot_info)
-
-    return tarots
-
-
-@router.get('/get_info')
-async def get_info(email: str, password_hashed: str, session: AsyncSession = Depends(get_session)):
-    # Проверяем аутентификацию пользователя
-    user = await authenticate_user(email, password_hashed, session=session)
-
-    # Получаем информацию о пользователе
-    favorite_info = await read_user_favorite_tarots(user.user_id, session=session)
-
-    # Получаем информацию о таро
-    tarot_info = await read_tarot(session=session)
-
-    # Получаем диалоги
-    message_info = await get_last_message(user.user_id, session=session)
-
-    return {"favorite_info": favorite_info, "tarot_info": tarot_info, "message_info": message_info}
-
-
 # функция для удаления юзера
 async def delete_user(user_id: int, session: AsyncSession = Depends(get_session)):
     db_user = await session.execute(select(UserProfile).filter(UserProfile.user_id == user_id))
@@ -238,4 +180,80 @@ async def delete_user_endpoint(user_id: int, session: AsyncSession = Depends(get
     return await delete_user(user_id, session)
 
 
+async def authenticate_user(email: str, password: str, session: AsyncSession = Depends(get_session)):
+    # Получаем данные пользователя по email
+    user = await session.execute(select(UserProfile).filter(UserProfile.email == email))
+    db_user = user.scalars().first()
+    if not db_user:
+        raise HTTPException(status_code=401, detail='Неправильные email или пароль')
+
+    # Проверяем введенный пароль с хешированным паролем из базы данных
+    if not await verify_password(password, db_user.password_hashed):
+        raise HTTPException(status_code=401, detail='Неправильные email или пароль')
+
+    return db_user
+
+
+@router.get('/find_tarot')
+async def read_tarot(session: AsyncSession = Depends(get_session)):
+    read_tarot_query = await session.execute(select(UserProfile).filter(UserProfile.role_id == 1))
+    db_users = read_tarot_query.scalars().all()
+    if not db_users:
+        raise HTTPException(status_code=404, detail='Tarot is not found')
+
+    tarots = []
+    for user in db_users:
+        tarot_info = {
+            'tarot_id': user.user_id,
+            'first_name': user.first_name,
+            'second_name': user.second_name,
+            'user_description': user.user_description,
+            'tarot_rating': user.tarot_rating,
+            #'reviews_count': user.reviews_count  # по умолчанию количество отзывов 0
+        }
+        tarots.append(tarot_info)
+    return tarots
+
+
+@router.get('/get_info/{email}/{password_hashed}')
+async def get_info(email: str, password_hashed: str, session: AsyncSession = Depends(get_session)):
+    # Проверяем аутентификацию пользователя
+    user = await authenticate_user(email, password_hashed, session=session)
+
+    favorite_info = None
+    tarot_info = None
+    message_info = None
+    profile_info = None
+
+
+    try:
+        favorite_info = await read_user_favorite_tarots(user.user_id, session=session)
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise e
+
+    try:
+        tarot_info = await read_tarot(session=session)
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise e
+
+    try:
+        message_info = await get_last_message(user.user_id, session=session)
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise e
+
+    try:
+        profile_info = await read_user(user.user_id, session=session)
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise e
+
+    return {
+        "profile_info": profile_info,
+        "favorite_info": favorite_info,
+        "tarot_info": tarot_info,
+        "message_info": message_info
+    }
 

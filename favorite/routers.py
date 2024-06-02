@@ -10,7 +10,7 @@ from favorite.models import UserFavoriteTarots
 from favorite.schemas import UserFavoriteTarotsCreate, UserFavoriteTarotsOut
 
 router = APIRouter(
-    prefix='/user_favorite_tarots',
+    prefix='/favorite',
     tags=['Favorite']
 )
 

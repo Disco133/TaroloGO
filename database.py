@@ -11,7 +11,9 @@ Base = declarative_base()  # для работы с базой данных не
 engine = create_async_engine(DATABASE_URL, echo=True)
 
 # Создание фабрики асинхронных сессий
-async_session_maker = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+async_session_maker = sessionmaker(
+    engine, expire_on_commit=False, class_=AsyncSession
+)
 async def get_session() -> AsyncSession:
     async with async_session_maker() as session:
         yield session

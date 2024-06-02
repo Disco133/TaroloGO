@@ -7,4 +7,6 @@ class UserFavoriteTarotsCreate(BaseModel):
 
 
 class UserFavoriteTarotsOut(BaseModel):
+    favorite_tarot_id: int
+    user_id: int
     tarot_id: int
