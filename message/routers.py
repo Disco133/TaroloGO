@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
@@ -84,19 +84,21 @@ async def get_messages_from_db(sender_id: int, recipient_id: int, session: Async
     if not all_messages:
         raise HTTPException(status_code=404, detail="No messages found")
 
-    return [
-        MessageOut(
+    # Формирование словаря сообщений
+    messages_dict = {
+        str(index + 1): MessageOut(
             message_id=message.message_id,
             sender_id=message.sender_id,
             recipient_id=message.recipient_id,
             message_text=message.message_text,
             message_date_send=message.message_date_send
-        ) for message in all_messages
-    ]
+        ) for index, message in enumerate(all_messages)
+    }
 
+    return messages_dict
 
-# запрос для получения переписки между пользователями
-@router.get("/show_chat/{sender_id}/recipient/{recipient_id}", response_model=List[MessageOut])
+# Запрос для получения переписки между пользователями
+@router.get("/show_chat/{sender_id}/recipient/{recipient_id}", response_model=Dict[str, MessageOut])
 async def get_messages(sender_id: int, recipient_id: int, session: AsyncSession = Depends(get_session)):
     return await get_messages_from_db(sender_id, recipient_id, session)
 

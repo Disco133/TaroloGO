@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -223,8 +223,10 @@ async def create_user_notification(role_id: int, notification_id: int, session: 
     return db_user_notifications
 
 
-@router.get("/user/{user_id}", response_model=List[NotificationByUserOut])
+# Маршрут для получения всех уведомлений определенного пользователя
+@router.get("/user/{user_id}", response_model=Dict[str, NotificationByUserOut])
 async def get_user_notifications(user_id: int, session: AsyncSession = Depends(get_session)):
+    # Запрос для получения уведомлений пользователя
     user_notifications_query = select(
         SystemNotification.notification_title,
         SystemNotification.notification_text
@@ -241,6 +243,12 @@ async def get_user_notifications(user_id: int, session: AsyncSession = Depends(g
     if not user_notifications:
         raise HTTPException(status_code=404, detail="No notifications found for this user")
 
-    return [
-        NotificationByUserOut(notification_title=notif.notification_title, notification_text=notif.notification_text)
-        for notif in user_notifications]
+    # Формирование словаря уведомлений
+    notifications_dict = {
+        str(index + 1): NotificationByUserOut(
+            notification_title=notif.notification_title,
+            notification_text=notif.notification_text
+        ) for index, notif in enumerate(user_notifications)
+    }
+
+    return notifications_dict
