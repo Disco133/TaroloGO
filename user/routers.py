@@ -194,7 +194,7 @@ async def authenticate_user(email: str, password: str, session: AsyncSession = D
 
     return db_user
 
-
+# информация про всех существующих тарологов
 @router.get('/find_tarot')
 async def read_tarot(session: AsyncSession = Depends(get_session)):
     read_tarot_query = await session.execute(select(UserProfile).filter(UserProfile.role_id == 1))
@@ -209,7 +209,7 @@ async def read_tarot(session: AsyncSession = Depends(get_session)):
             'first_name': user.first_name,
             'second_name': user.second_name,
             'user_description': user.user_description,
-            'tarot_rating': user.tarot_rating,
+           'tarot_rating': user.tarot_rating,
             # 'reviews_count': user.reviews_count  # по умолчанию количество отзывов 0
         }
         tarots[str(index)] = tarot_info
