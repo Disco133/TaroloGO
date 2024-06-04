@@ -8,7 +8,6 @@ from user.models import UserProfile
 from database import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 router = APIRouter(
     prefix='/service',
     tags=['Service']
@@ -73,7 +72,8 @@ async def update_service_price(service_id: int, service_price: int, session: Asy
 
 # обновление описания услуги
 @router.post("/update_service_description/{service_id}")
-async def update_service_description(service_id: int, service_description: str, session: AsyncSession = Depends(get_session)):
+async def update_service_description(service_id: int, service_description: str,
+                                     session: AsyncSession = Depends(get_session)):
     service_description_query = await session.execute(select(Service).filter(Service.service_id == service_id))
     db_service_description = service_description_query.scalars().first()
     if db_service_description is None:
@@ -94,6 +94,7 @@ async def read_service(service_id: int, session: AsyncSession = Depends(get_sess
     return db_find_service
 
 
+# вывод всех услуг у одного таролога
 @router.get('/{tarot_id}', response_model=Dict[str, ServiceOut])
 async def read_user_service(tarot_id: int, session: AsyncSession = Depends(get_session)):
     read_service_query = (
