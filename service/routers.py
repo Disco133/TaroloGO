@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from service.schemas import ServiceCreate, ServiceOut
@@ -90,6 +92,25 @@ async def read_service(service_id: int, session: AsyncSession = Depends(get_sess
     if not db_find_service:
         raise HTTPException(status_code=404, detail='Service is not found')
     return db_find_service
+
+
+@router.get('/{tarot_id}', response_model=Dict[str, ServiceOut])
+async def read_user_service(tarot_id: int, session: AsyncSession = Depends(get_session)):
+    read_service_query = (
+        await session.execute(
+            select(Service)
+            .filter(Service.tarot_id == tarot_id)
+        )
+    )
+    db_service = read_service_query.scalars().all()
+    if not db_service:
+        raise HTTPException(status_code=404, detail="No services found for this tarot")
+
+    services = {}
+    for index, service in enumerate(db_service, start=1):
+        services[str(index)] = service
+
+    return services
 
 
 # функция удаления услуги

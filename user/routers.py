@@ -9,7 +9,8 @@ from user.schemas import UserCreate, UserOut
 from database import get_session
 from favorite.routers import read_user_favorite_tarots
 from message.routers import get_last_message
-from fastapi_cache.decorator import cache
+
+# from fastapi_cache.decorator import cache
 
 router = APIRouter(
     prefix='/user',
@@ -201,17 +202,17 @@ async def read_tarot(session: AsyncSession = Depends(get_session)):
     if not db_users:
         raise HTTPException(status_code=404, detail='Tarot is not found')
 
-    tarots = []
-    for user in db_users:
+    tarots = {}
+    for index, user in enumerate(db_users, start=1):
         tarot_info = {
             'tarot_id': user.user_id,
             'first_name': user.first_name,
             'second_name': user.second_name,
             'user_description': user.user_description,
             'tarot_rating': user.tarot_rating,
-            #'reviews_count': user.reviews_count  # по умолчанию количество отзывов 0
+            # 'reviews_count': user.reviews_count  # по умолчанию количество отзывов 0
         }
-        tarots.append(tarot_info)
+        tarots[str(index)] = tarot_info
     return tarots
 
 
@@ -224,7 +225,6 @@ async def get_info(email: str, password_hashed: str, session: AsyncSession = Dep
     tarot_info = None
     message_info = None
     profile_info = None
-
 
     try:
         favorite_info = await read_user_favorite_tarots(user.user_id, session=session)
@@ -250,10 +250,14 @@ async def get_info(email: str, password_hashed: str, session: AsyncSession = Dep
         if e.status_code != 404:
             raise e
 
-    return {
+    response = {
         "profile_info": profile_info,
         "favorite_info": favorite_info,
-        "tarot_info": tarot_info,
         "message_info": message_info
     }
 
+    # Добавляем информацию о тарологах отдельно
+    if tarot_info:
+        response.update(tarot_info)
+
+    return response

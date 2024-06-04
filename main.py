@@ -1,8 +1,8 @@
 import uvicorn
 from fastapi import FastAPI
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
-from redis import asyncio as aioredis
+# from fastapi_cache import FastAPICache
+# from fastapi_cache.backends.redis import RedisBackend
+# from redis import asyncio as aioredis
 
 
 from database import engine, Base
@@ -44,10 +44,10 @@ app.include_router(favorite_router, tags=['Favorite'])
 app.include_router(status_router, tags=['Status'])
 
 
-@app.on_event("startup")
-async def startup_event():
-    redis = aioredis.from_url("redis://localhost", encoding="utf8", decode_responses=True)
-    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+# @app.on_event("startup")
+# async def startup_event():
+#     redis = aioredis.from_url("redis://localhost", encoding="utf8", decode_responses=True)
+#     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
 
 
 # автоматический запуск uvicorn
