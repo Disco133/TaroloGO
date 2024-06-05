@@ -141,16 +141,38 @@ async def read_user_service_history(history_id: int, session: AsyncSession = Dep
 async def read_user_service_history(user_id: int, session: AsyncSession = Depends(get_session)):
     read_service_history_query = (
         await session.execute(
-            select(UserServiceHistory)
+            select(UserServiceHistory.history_id,
+                   UserServiceHistory.tarot_id,
+                   UserServiceHistory.user_id,
+                   UserServiceHistory.service_id,
+                   UserServiceHistory.status_id,
+                   UserProfile.first_name,
+                   UserProfile.second_name,
+                   Service.service_name,
+                   Service.service_price
+                   )
+            .join(UserProfile, UserServiceHistory.tarot_id == UserProfile.user_id)
+            .join(Service, UserServiceHistory.service_id == Service.service_id)
             .filter(UserServiceHistory.user_id == user_id)
         )
     )
-    db_service_history = read_service_history_query.scalars().all()
+    db_service_history = read_service_history_query.all()
     if not db_service_history:
         raise HTTPException(status_code=404, detail="No service history found for this tarot")
 
     service_history = {}
     for index, service in enumerate(db_service_history, start=1):
-        service_history[str(index)] = service
+        history = UserServiceHistoryOut(
+            history_id=service.history_id,
+            tarot_id=service.tarot_id,
+            user_id=service.user_id,
+            service_id=service.service_id,
+            status_id=service.status_id,
+            first_name=service.first_name,
+            second_name=service.second_name,
+            service_name=service.service_name,
+            service_price=service.service_price
+        )
+        service_history[str(index)] = history
 
     return service_history

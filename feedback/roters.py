@@ -49,7 +49,7 @@ async def create_feedback_endpoint(feedback: FeedbackCreate, session: AsyncSessi
 
 @router.post("/mark_oldest_unread_as_read", response_model=FeedbackRead)
 async def mark_oldest_unread_as_read(session: AsyncSession = Depends(get_session)):
-    feedback_read_query = await session.execute(select(Feedback).filter(Feedback.is_read== False).order_by(asc(Feedback.feedback_datetime)))
+    feedback_read_query = await session.execute(select(Feedback).filter(Feedback.is_read == False).order_by(asc(Feedback.feedback_datetime)))
     db_feedback_read = feedback_read_query.scalars().first()
     if not db_feedback_read:
         raise HTTPException(status_code=404, detail="No unread feedback found")

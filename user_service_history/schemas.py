@@ -11,10 +11,14 @@ class UserServiceHistoryCreate(BaseModel):
 
 class UserServiceHistoryOut(BaseModel):
     history_id: int
+    tarot_id: int
     user_id: int
     service_id: int
     status_id: int
-
+    first_name: str
+    second_name: str
+    service_name: str
+    service_price: float
 
 class UserServiceHistoryUpdateReview(BaseModel):
     history_id: int
