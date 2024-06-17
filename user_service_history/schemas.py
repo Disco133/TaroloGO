@@ -20,6 +20,7 @@ class UserServiceHistoryOut(BaseModel):
     service_name: str
     service_price: float
 
+
 class UserServiceHistoryUpdateReview(BaseModel):
     history_id: int
     review_title: str

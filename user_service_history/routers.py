@@ -37,7 +37,7 @@ async def create_history(history: UserServiceHistoryCreate, session: AsyncSessio
 
 
 # создание истории
-@router.post("/create", response_model=UserServiceHistoryOut)
+@router.post("/create")
 async def create_user_endpoint(history: UserServiceHistoryCreate, session: AsyncSession = Depends(get_session)):
     db_history_create = await create_history(history, session)
     if db_history_create is None:
@@ -94,12 +94,12 @@ async def update_tarot_rating(tarot_id: int, old_review_value: int, new_review_v
         new_rating = new_reviews_sum / (current_reviews_count + 1)
         # Обновляем среднюю оценку таролога в таблице UserProfile
         db_tarot_rating_update.tarot_rating = new_rating
-    # db_tarot_rating_update.review_count += 1
+        db_tarot_rating_update.review_count += 1
     await session.commit()
 
 
 # Маршрут для обновления отзыва
-@router.post("/update_review/{history_id}", response_model=UserServiceHistoryOut)
+@router.post("/update_review/{history_id}")
 async def update_review_endpoint(history_update: UserServiceHistoryUpdateReview,
                                  session: AsyncSession = Depends(get_session)):
     updated_history = await update_review(history_update, session)
@@ -126,7 +126,7 @@ async def update_service_status(history_id: int, status_id: int, session: AsyncS
 
 
 # вывод user_service_history
-@router.get("/user_service_history/{history_id}")
+@router.get("/{history_id}")
 async def read_user_service_history(history_id: int, session: AsyncSession = Depends(get_session)):
     history_query = await session.execute(select(UserServiceHistory).filter(
         UserServiceHistory.history_id == history_id))

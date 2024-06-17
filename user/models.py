@@ -22,4 +22,4 @@ class UserProfile(Base):
     user_description = Column(String, nullable=True)
     tarot_experience = Column(Float, nullable=True)
     tarot_rating = Column(Float, nullable=True, default=0)
-    #review_count = Column(Integer, nullable=True, default=0)
+    review_count = Column(Integer, nullable=True, default=0)

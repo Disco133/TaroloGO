@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, asc, delete
@@ -58,6 +58,38 @@ async def mark_oldest_unread_as_read(session: AsyncSession = Depends(get_session
     await session.commit()
     await session.refresh(db_feedback_read)
     return FeedbackRead(feedback_id=db_feedback_read.feedback_id, feedback_text = db_feedback_read.feedback_text, is_read=db_feedback_read.is_read)
+
+
+# вывод фитбека по feedback_id
+@router.get("/find_feedback/{feedback_id}")
+async def read_feedback(feedback_id: int, session: AsyncSession = Depends(get_session)):
+    db_feedback = await session.execute(select(Feedback).filter(Feedback.feedback_id == feedback_id))
+    db_feedback = db_feedback.scalar()
+
+    if not db_feedback:
+        raise HTTPException(status_code=404, detail="Feedback is not found")
+
+    return db_feedback
+
+
+# весь feedback пользователя
+@router.get('/{user_id}', response_model=Dict[str, FeedbackOut])
+async def read_user_feedback(user_id: int, session: AsyncSession = Depends(get_session)):
+    read_feedback_query = (
+        await session.execute(
+            select(Feedback)
+            .filter(Feedback.user_id == user_id)
+        )
+    )
+    db_feedback = read_feedback_query.scalars().all()
+    if not db_feedback:
+        raise HTTPException(status_code=404, detail="Feedbacks is not found")
+
+    feedbacks = {}
+    for index, feedback in enumerate(db_feedback, start=1):
+        feedbacks[str(index)] = feedback
+
+    return feedbacks
 
 
 @router.delete("/delete_old_reads")
