@@ -3,6 +3,7 @@ import time
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from user.models import UserProfile
 from user.schemas import UserCreate, UserOut
@@ -161,6 +162,41 @@ async def read_user(user_id: int, session: AsyncSession = Depends(get_session)):
     return db_user
 
 
+# вывод всех пользователей
+@router.get('/find_users')
+async def read_users(session: AsyncSession = Depends(get_session)):
+    read_users_query = await session.execute(
+        select(UserProfile).filter(
+            or_(UserProfile.role_id == 1, UserProfile.role_id == 2)
+        )
+    )
+    db_users = read_users_query.scalars().all()
+
+    if not db_users:
+        raise HTTPException(status_code=404, detail='Users is not found')
+
+    users = {}
+    for index, user in enumerate(db_users, start=1):
+        user_info = {
+            'user_id': user.user_id,
+            'role_id': user.role_id,
+            'username': user.username,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'date_birth': user.date_birth,
+            'first_name': user.first_name,
+            'second_name': user.second_name,
+            'user_description': user.user_description,
+            'date_registration': user.date_registration,
+            'tarot_experience': user.tarot_experience,
+            'tarot_rating': user.tarot_rating,
+            'review_count': user.review_count,
+            'is_deleted': user.is_deleted
+        }
+        users[str(index)] = user_info
+    return users
+
+
 # функция для удаления юзера
 async def delete_user(user_id: int, session: AsyncSession = Depends(get_session)):
     db_user = await session.execute(select(UserProfile).filter(UserProfile.user_id == user_id))
@@ -211,7 +247,7 @@ async def read_tarot(session: AsyncSession = Depends(get_session)):
             'second_name': user.second_name,
             'user_description': user.user_description,
             'tarot_rating': user.tarot_rating,
-            'reviews_count': user.reviews_count  # по умолчанию количество отзывов 0
+            'review_count': user.review_count  # по умолчанию количество отзывов 0
         }
         tarots[str(index)] = tarot_info
     return tarots
